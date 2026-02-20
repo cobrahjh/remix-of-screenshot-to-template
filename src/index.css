@@ -107,4 +107,16 @@
       inset 0 -1px 0 hsl(220 20% 6%),
       0 4px 12px hsl(220 20% 4% / 0.8);
   }
+
+  /* Leaflet tooltip overrides for avionics style */
+  .leaflet-tooltip-avionics {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+
+  .leaflet-tooltip-avionics::before {
+    display: none !important;
+  }
 }
