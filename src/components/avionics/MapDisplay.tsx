@@ -62,6 +62,40 @@ const VICTOR_AIRWAYS: { id: string; color: string; waypoints: { id: string; lat:
       { id: "AVE", lat: 34.9544, lng: -118.3465, type: "VOR" },
     ],
   },
+  {
+    id: "V27",
+    color: "hsl(120, 80%, 50%)",
+    waypoints: [
+      { id: "LAX", lat: 33.9425, lng: -118.4081, type: "VOR" },
+      { id: "VNY", lat: 34.2098, lng: -118.4895, type: "VOR" },
+      { id: "FLW", lat: 34.7461, lng: -118.3619, type: "VOR" },
+      { id: "PMD", lat: 34.6294, lng: -118.0847, type: "VOR" },
+      { id: "EHF", lat: 35.0833, lng: -117.8308, type: "VOR" },
+    ],
+  },
+  {
+    id: "V195",
+    color: "hsl(280, 80%, 60%)",
+    waypoints: [
+      { id: "BFL", lat: 35.4336, lng: -119.0568, type: "VOR" },
+      { id: "VIS", lat: 36.3187, lng: -119.3929, type: "VOR" },
+      { id: "FAT", lat: 36.7762, lng: -119.7181, type: "VOR" },
+      { id: "MOD", lat: 37.6258, lng: -120.9544, type: "VOR" },
+      { id: "SAC", lat: 38.5125, lng: -121.4944, type: "VOR" },
+    ],
+  },
+  {
+    id: "V230",
+    color: "hsl(15, 90%, 55%)",
+    waypoints: [
+      { id: "SBA", lat: 34.4262, lng: -119.8401, type: "VOR" },
+      { id: "RZS", lat: 34.5214, lng: -119.1053, type: "VOR" },
+      { id: "FIM", lat: 34.3533, lng: -118.5531, type: "VOR" },
+      { id: "VNY", lat: 34.2098, lng: -118.4895, type: "VOR" },
+      { id: "PDZ", lat: 33.9275, lng: -117.6900, type: "VOR" },
+      { id: "PSP", lat: 33.8303, lng: -116.5067, type: "VOR" },
+    ],
+  },
 ];
 
 type FlightCategory = "VFR" | "MVFR" | "IFR" | "LIFR" | "UNKN";
