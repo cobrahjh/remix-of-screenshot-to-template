@@ -21,7 +21,7 @@ const BottomButton = ({ icon, label, onClick, active }: BottomButtonProps) => (
 );
 
 export const BottomToolbar = () => {
-  const { goBack, navigateTo, currentPage } = useGtn();
+  const { goBack, navigateTo, currentPage, mapZoomIn, mapZoomOut } = useGtn();
 
   return (
     <div className="bg-avionics-panel">
@@ -62,10 +62,12 @@ export const BottomToolbar = () => {
         <BottomButton
           icon={<ZoomIn className="w-3.5 h-3.5 text-avionics-white" />}
           label="In"
+          onClick={mapZoomIn}
         />
         <BottomButton
           icon={<ZoomOut className="w-3.5 h-3.5 text-avionics-white" />}
           label="Out"
+          onClick={mapZoomOut}
         />
       </div>
     </div>

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useRef } from "react";
 
 export type GtnPage = "map" | "home" | "traffic" | "terrain" | "weather" | "charts" | "flightplan" | "proc" | "nearest" | "waypoint" | "services" | "utilities" | "system" | "directto" | "emergency" | "fuel" | "pfd" | "vcalc" | "trip" | "dalt" | "checklists" | "safetaxi";
 
@@ -76,6 +76,9 @@ interface GtnContextValue extends GtnState {
   setActiveWaypoint: (index: number) => void;
   toggleObs: () => void;
   setObsCourse: (course: number) => void;
+  mapZoomIn: () => void;
+  mapZoomOut: () => void;
+  registerMapZoom: (zoomIn: () => void, zoomOut: () => void) => void;
 }
 
 const GtnContext = createContext<GtnContextValue | null>(null);
@@ -214,6 +217,15 @@ export const GtnProvider = ({ children }: { children: React.ReactNode }) => {
     setState(s => ({ ...s, obsCourse: course }));
   }, []);
 
+  const mapZoomRef = useRef<{ zoomIn: () => void; zoomOut: () => void } | null>(null);
+
+  const registerMapZoom = useCallback((zoomIn: () => void, zoomOut: () => void) => {
+    mapZoomRef.current = { zoomIn, zoomOut };
+  }, []);
+
+  const mapZoomIn = useCallback(() => { mapZoomRef.current?.zoomIn(); }, []);
+  const mapZoomOut = useCallback(() => { mapZoomRef.current?.zoomOut(); }, []);
+
   return (
     <GtnContext.Provider value={{
       ...state, navigateTo, goBack, swapComFreqs, setComStandby,
@@ -221,6 +233,7 @@ export const GtnProvider = ({ children }: { children: React.ReactNode }) => {
       setXpdrMode, setXpdrCode, toggleAudioSetting,
       activateDirectTo, cancelDirectTo, toggleSmartGlide, toggleEmergencyDescent,
       setActiveWaypoint, toggleObs, setObsCourse,
+      mapZoomIn, mapZoomOut, registerMapZoom,
     }}>
       {children}
     </GtnContext.Provider>
