@@ -1,11 +1,15 @@
+import { useGtn } from "./GtnContext";
+import { ComPanel } from "./ComPanel";
+
 interface FrequencyDisplayProps {
   label: string;
   activeFreq: string;
   standbyFreq: string;
   standbyLabel?: string;
+  onStandbyClick?: () => void;
 }
 
-const FrequencyDisplay = ({ label, activeFreq, standbyFreq, standbyLabel }: FrequencyDisplayProps) => (
+const FrequencyDisplay = ({ label, activeFreq, standbyFreq, standbyLabel, onStandbyClick }: FrequencyDisplayProps) => (
   <div className="flex flex-col gap-0.5">
     <div className="flex items-center gap-2">
       <span className="text-[10px] text-avionics-label uppercase tracking-wider">{label}</span>
@@ -13,81 +17,84 @@ const FrequencyDisplay = ({ label, activeFreq, standbyFreq, standbyLabel }: Freq
         {activeFreq}
       </span>
     </div>
-    <div className="flex items-center gap-2">
+    <button onClick={onStandbyClick} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
       <span className="text-[10px] text-avionics-label uppercase tracking-wider">
         {standbyLabel || "STBY"}
       </span>
       <span className="font-mono text-sm text-avionics-cyan leading-none">
         {standbyFreq}
       </span>
-    </div>
+    </button>
   </div>
 );
 
 export const TopBar = () => {
+  const { com, nav, xpdrCode, xpdrMode, toggleComPanel, swapComFreqs } = useGtn();
+
   return (
-    <div className="flex items-stretch bg-avionics-panel border-b border-avionics-divider">
+    <div className="flex items-stretch bg-avionics-panel border-b border-avionics-divider relative">
       {/* COM Frequencies */}
-      <div className="flex items-center px-3 py-2 border-r border-avionics-divider">
+      <div className="flex items-center px-2 py-1.5 border-r border-avionics-divider">
         <div className="flex flex-col mr-1">
           <span className="text-[9px] text-avionics-label">COM</span>
           <span className="text-[9px] text-avionics-label">Vol</span>
-          <span className="text-[8px] text-avionics-label">Psn</span>
+          <span className="text-[8px] text-avionics-label">Psh</span>
           <span className="text-[8px] text-avionics-label">Sq</span>
         </div>
         <FrequencyDisplay
-          label="APPROACH+"
-          activeFreq="133.00"
-          standbyFreq="119.52"
-          standbyLabel="KSNS TWR"
+          label={com.activeLabel}
+          activeFreq={com.activeFreq}
+          standbyFreq={com.standbyFreq}
+          standbyLabel={com.standbyLabel || "STBY"}
+          onStandbyClick={toggleComPanel}
         />
       </div>
 
       {/* Audio Panel */}
-      <button className="flex flex-col items-center justify-center px-4 py-2 border-r border-avionics-divider hover:bg-avionics-button-hover transition-colors">
-        <span className="text-xs text-avionics-white font-medium">Audio</span>
-        <span className="text-xs text-avionics-white font-medium">Panel</span>
+      <button className="flex flex-col items-center justify-center px-3 py-1.5 border-r border-avionics-divider hover:bg-avionics-button-hover transition-colors">
+        <span className="text-[10px] text-avionics-white font-medium">Audio</span>
+        <span className="text-[10px] text-avionics-white font-medium">Panel</span>
       </button>
 
-      {/* MIC/MON indicators */}
-      <div className="flex flex-col items-center justify-center px-3 py-2 border-r border-avionics-divider gap-1">
+      {/* MIC/MON */}
+      <div className="flex flex-col items-center justify-center px-2 py-1.5 border-r border-avionics-divider gap-0.5">
         <div className="flex items-center gap-1">
-          <span className="text-[9px] text-avionics-label">MIC</span>
-          <span className="bg-avionics-green text-primary-foreground text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-sm">
-            1
-          </span>
+          <span className="text-[8px] text-avionics-label">MIC</span>
+          <span className="bg-avionics-green text-primary-foreground text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-sm">1</span>
         </div>
         <div className="flex items-center gap-1">
-          <span className="text-[9px] text-avionics-label">MON</span>
-          <span className="bg-avionics-green text-primary-foreground text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-sm">
-            1
-          </span>
+          <span className="text-[8px] text-avionics-label">MON</span>
+          <span className="bg-avionics-green text-primary-foreground text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-sm">1</span>
         </div>
       </div>
-
-      {/* Intercom */}
-      <button className="flex flex-col items-center justify-center px-4 py-2 border-r border-avionics-divider hover:bg-avionics-button-hover transition-colors">
-        <span className="text-xs text-avionics-white font-medium">Intercom</span>
-      </button>
 
       {/* XPDR */}
-      <div className="flex items-center px-3 py-2 border-r border-avionics-divider">
+      <div className="flex items-center gap-1 px-2 py-1.5 border-r border-avionics-divider">
         <div className="flex flex-col items-center">
-          <span className="text-[9px] text-avionics-label">XPDR</span>
-          <span className="text-xs text-avionics-white">IDEN</span>
+          <span className="text-[8px] text-avionics-label">XPDR</span>
+          <span className="font-mono text-sm text-avionics-green avionics-glow-green font-bold">{xpdrCode}</span>
         </div>
-      </div>
-
-      {/* Transponder Code */}
-      <div className="flex items-center px-3 py-2">
-        <span className="font-mono text-xl text-avionics-green avionics-glow-green font-bold">
-          6061
-        </span>
       </div>
 
       {/* ALT indicator */}
-      <div className="flex items-center px-2 py-2">
-        <span className="text-[10px] text-avionics-label">ALT</span>
+      <div className="flex items-center px-2 py-1.5 border-r border-avionics-divider">
+        <span className={`text-[10px] font-mono font-bold ${xpdrMode === "ALT" ? "text-avionics-green" : "text-avionics-label"}`}>
+          {xpdrMode}<sup className="text-[7px]">R</sup>
+        </span>
+      </div>
+
+      {/* NAV Frequencies */}
+      <div className="flex items-center px-2 py-1.5">
+        <div className="flex flex-col mr-1">
+          <span className="text-[9px] text-avionics-label">NAV</span>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="font-mono text-sm text-avionics-green avionics-glow-green font-bold leading-none">{nav.activeFreq}</span>
+          <div className="flex items-center gap-1">
+            <span className="text-[8px] text-avionics-label">STBY</span>
+            <span className="font-mono text-xs text-avionics-cyan leading-none">{nav.standbyFreq}</span>
+          </div>
+        </div>
       </div>
     </div>
   );
