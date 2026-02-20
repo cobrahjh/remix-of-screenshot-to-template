@@ -24,6 +24,7 @@ import { ChartsScreen } from "@/components/avionics/screens/ChartsScreen";
 import { WaypointScreen } from "@/components/avionics/screens/WaypointScreen";
 import { ServicesScreen } from "@/components/avionics/screens/ServicesScreen";
 import { FuelScreen } from "@/components/avionics/screens/FuelScreen";
+import { PfdScreen } from "@/components/avionics/screens/PfdScreen";
 import { PlaceholderScreen } from "@/components/avionics/screens/PlaceholderScreen";
 import { CdiBar } from "@/components/avionics/CdiBar";
 import { Home, Navigation } from "lucide-react";
@@ -71,6 +72,8 @@ const GtnDisplay = () => {
         return <ServicesScreen />;
       case "fuel":
         return <FuelScreen />;
+      case "pfd":
+        return <PfdScreen />;
       default:
         return <PlaceholderScreen page={currentPage} />;
     }
@@ -107,6 +110,7 @@ const GtnDisplay = () => {
       {/* Page locator bar */}
       <div className="flex items-center bg-avionics-panel-dark border-b border-avionics-divider px-1 overflow-x-auto">
         {([
+          { label: "PFD", page: "pfd" as const },
           { label: "NAV MAP", page: "map" as const },
           { label: "FPL", page: "flightplan" as const },
           { label: "TRFC", page: "traffic" as const },
