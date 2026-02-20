@@ -13,6 +13,10 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        mono: ['"Share Tech Mono"', 'monospace'],
+        body: ['"Exo 2"', 'sans-serif'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -57,6 +61,21 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        avionics: {
+          green: "hsl(var(--avionics-green))",
+          cyan: "hsl(var(--avionics-cyan))",
+          magenta: "hsl(var(--avionics-magenta))",
+          amber: "hsl(var(--avionics-amber))",
+          white: "hsl(var(--avionics-white))",
+          panel: "hsl(var(--avionics-panel))",
+          "panel-dark": "hsl(var(--avionics-panel-dark))",
+          button: "hsl(var(--avionics-button))",
+          "button-hover": "hsl(var(--avionics-button-hover))",
+          "button-active": "hsl(var(--avionics-button-active))",
+          divider: "hsl(var(--avionics-divider))",
+          label: "hsl(var(--avionics-label))",
+          inset: "hsl(var(--avionics-inset))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -65,20 +84,12 @@ export default {
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
         },
       },
       animation: {
