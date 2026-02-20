@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
+import { useFlightData, ConnectionMode } from "../FlightDataContext";
+import { Wifi, WifiOff, TestTube2 } from "lucide-react";
 
-type Tab = "setup" | "gps" | "units" | "database" | "backlight";
+type Tab = "conn" | "setup" | "gps" | "units" | "database" | "backlight";
 
 const TabButton = ({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) => (
   <button
@@ -203,10 +205,98 @@ const UnitsTab = () => (
   </div>
 );
 
+const ConnectionTab = () => {
+  const { connectionMode, testMode, setTestMode, wsUrl, setWsUrl, connectWebSocket, disconnectWebSocket, flight, fuel, navigation } = useFlightData();
+
+  const statusColor: Record<ConnectionMode, string> = {
+    none: "text-avionics-label",
+    test: "text-avionics-amber",
+    flowpro: "text-avionics-green",
+    websocket: "text-avionics-cyan",
+  };
+
+  const statusLabel: Record<ConnectionMode, string> = {
+    none: "AWAITING SIM",
+    test: "TEST MODE",
+    flowpro: "FLOW PRO",
+    websocket: "WS BRIDGE",
+  };
+
+  const StatusIcon = connectionMode === "none" ? WifiOff : connectionMode === "test" ? TestTube2 : Wifi;
+
+  return (
+    <div>
+      {/* Connection status */}
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-avionics-divider">
+        <div className="flex items-center gap-2">
+          <StatusIcon className={`w-4 h-4 ${statusColor[connectionMode]}`} />
+          <span className={`font-mono text-[11px] font-bold ${statusColor[connectionMode]}`}>
+            {statusLabel[connectionMode]}
+          </span>
+        </div>
+        <div className={`w-2 h-2 rounded-full ${connectionMode !== "none" ? "bg-avionics-green animate-pulse" : "bg-avionics-divider"}`} />
+      </div>
+
+      {/* Test mode toggle */}
+      <button
+        onClick={() => setTestMode(!testMode)}
+        className={`w-full flex items-center justify-between px-3 py-2.5 border-b border-avionics-divider/50 transition-colors ${
+          testMode ? "bg-avionics-amber/10" : "hover:bg-avionics-button-hover"
+        }`}
+      >
+        <span className="text-[10px] text-avionics-white">Test Mode (Simulated Data)</span>
+        <span className={`font-mono text-[10px] font-bold ${testMode ? "text-avionics-amber" : "text-avionics-label"}`}>
+          {testMode ? "ON" : "OFF"}
+        </span>
+      </button>
+
+      {/* WebSocket bridge */}
+      <div className="px-3 py-2.5 border-b border-avionics-divider/50">
+        <span className="text-[9px] text-avionics-label mb-1.5 block">WEBSOCKET BRIDGE</span>
+        <div className="flex items-center gap-1.5">
+          <input
+            type="text"
+            value={wsUrl}
+            onChange={(e) => setWsUrl(e.target.value)}
+            disabled={testMode}
+            className="flex-1 bg-avionics-inset text-avionics-white font-mono text-[10px] px-2 py-1.5 rounded border border-avionics-divider focus:border-avionics-cyan focus:outline-none disabled:opacity-40"
+          />
+          {connectionMode === "websocket" ? (
+            <button onClick={disconnectWebSocket} className="px-2 py-1.5 text-[9px] font-mono text-destructive bg-destructive/10 rounded border border-destructive/30 hover:bg-destructive/20">
+              DISC
+            </button>
+          ) : (
+            <button onClick={connectWebSocket} disabled={testMode} className="px-2 py-1.5 text-[9px] font-mono text-avionics-cyan bg-avionics-button rounded border border-avionics-divider hover:bg-avionics-button-hover disabled:opacity-40">
+              CONN
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Live data readout */}
+      {connectionMode !== "none" && (
+        <>
+          <div className="px-3 py-1.5 border-b border-avionics-divider">
+            <span className="font-mono text-[9px] text-avionics-amber">LIVE DATA</span>
+          </div>
+          <SettingRow label="Altitude" value={`${flight.altitude.toLocaleString()} ft`} color="text-avionics-green" />
+          <SettingRow label="Ground Speed" value={`${flight.groundSpeed} kt`} color="text-avionics-green" />
+          <SettingRow label="Heading" value={`${flight.heading.toString().padStart(3, "0")}°`} />
+          <SettingRow label="Position" value={`${flight.lat.toFixed(4)} / ${flight.lng.toFixed(4)}`} />
+          <SettingRow label="Fuel" value={`${fuel.current.toLocaleString()} lbs (${fuel.endurance})`} color={fuel.current > 0 ? "text-avionics-green" : "text-avionics-label"} />
+          <SettingRow label="Next WPT" value={`${navigation.nextWaypoint} — ${navigation.distanceToNext} NM`} />
+          <SettingRow label="ETA" value={navigation.eta} color="text-avionics-cyan" />
+        </>
+      )}
+    </div>
+  );
+};
+
 export const SystemScreen = () => {
-  const [activeTab, setActiveTab] = useState<Tab>("gps");
+  const [activeTab, setActiveTab] = useState<Tab>("conn");
 
   const tabLabels: Record<Tab, string> = {
+    conn: "Conn",
     setup: "Setup",
     gps: "GPS",
     units: "Units",
@@ -229,6 +319,7 @@ export const SystemScreen = () => {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
+        {activeTab === "conn" && <ConnectionTab />}
         {activeTab === "setup" && (
           <div>
             <SettingRow label="CDI Scale" value="Auto" />

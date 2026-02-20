@@ -2,23 +2,27 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useGtn } from "./GtnContext";
+import { useFlightData } from "./FlightDataContext";
 
 export const MapDisplay = () => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
+  const aircraftMarker = useRef<L.Marker | null>(null);
   const { flightPlan, activeWaypointIndex } = useGtn();
+  const { flight, connectionMode } = useFlightData();
+  const isLive = connectionMode !== "none";
 
+  // Initialize map once
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
 
     const map = L.map(mapRef.current, {
-      center: [36.73, -121.78],
+      center: [flight.lat, flight.lng],
       zoom: 11,
       zoomControl: false,
       attributionControl: false,
     });
 
-    // Dark aviation-style tiles
     L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
       maxZoom: 19,
     }).addTo(map);
@@ -53,51 +57,57 @@ export const MapDisplay = () => {
       });
 
       const marker = L.marker([wp.lat, wp.lng], { icon }).addTo(map);
-
-      // Label tooltip
       marker.bindTooltip(
         `<span style="font-family:'Share Tech Mono',monospace;font-size:10px;color:${color};background:hsla(220,20%,8%,0.85);padding:1px 4px;border:1px solid ${color};border-radius:2px;">${wp.name}${wp.alt ? ` ${wp.alt}'` : ""}</span>`,
-        {
-          permanent: true,
-          direction: "right",
-          offset: [6, 0],
-          className: "leaflet-tooltip-avionics",
-        }
+        { permanent: true, direction: "right", offset: [6, 0], className: "leaflet-tooltip-avionics" }
       );
     });
 
-    // Aircraft icon at active waypoint (or between previous and active)
-    const activeWp = flightPlan[activeWaypointIndex];
-    if (activeWp) {
-      const prevWp = flightPlan[activeWaypointIndex - 1];
-      const acLat = prevWp ? (prevWp.lat + activeWp.lat) / 2 : activeWp.lat;
-      const acLng = prevWp ? (prevWp.lng + activeWp.lng) / 2 : activeWp.lng;
+    // Aircraft marker
+    const aircraftIcon = L.divIcon({
+      className: "",
+      html: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path d="M12 2L12 22M12 2L8 8M12 2L16 8M4 14H20" stroke="hsl(0,0%,92%)" stroke-width="2" stroke-linecap="round"/>
+      </svg>`,
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+    });
 
-      const aircraftIcon = L.divIcon({
-        className: "",
-        html: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <path d="M12 2L12 22M12 2L8 8M12 2L16 8M4 14H20" stroke="hsl(0,0%,92%)" stroke-width="2" stroke-linecap="round"/>
-        </svg>`,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
-      });
-
-      L.marker([acLat, acLng], { icon: aircraftIcon, zIndexOffset: 1000 }).addTo(map);
-      map.setView([acLat, acLng], 11);
-    }
-
+    aircraftMarker.current = L.marker([flight.lat, flight.lng], { icon: aircraftIcon, zIndexOffset: 1000 }).addTo(map);
     mapInstance.current = map;
 
-    return () => {
-      map.remove();
-      mapInstance.current = null;
-    };
-  }, [flightPlan, activeWaypointIndex]);
+    return () => { map.remove(); mapInstance.current = null; aircraftMarker.current = null; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Update aircraft position when flight data changes
+  useEffect(() => {
+    if (!aircraftMarker.current || !mapInstance.current) return;
+    aircraftMarker.current.setLatLng([flight.lat, flight.lng]);
+
+    // Rotate aircraft SVG
+    const el = aircraftMarker.current.getElement();
+    if (el) {
+      el.style.transformOrigin = "center center";
+      el.style.transform = `${el.style.transform?.replace(/rotate\([^)]+\)/, '') || ''} rotate(${flight.heading}deg)`;
+    }
+
+    if (isLive) {
+      mapInstance.current.panTo([flight.lat, flight.lng], { animate: true, duration: 0.5 });
+    }
+  }, [flight.lat, flight.lng, flight.heading, isLive]);
 
   return (
     <div className="flex-1 relative overflow-hidden">
       <div ref={mapRef} className="absolute inset-0" />
-      {/* Range indicator overlay */}
+      {/* Connection status overlay */}
+      <div className="absolute top-2 left-2 z-[1000] flex items-center gap-1.5">
+        <div className={`w-1.5 h-1.5 rounded-full ${isLive ? "bg-avionics-green animate-pulse" : "bg-avionics-divider"}`} />
+        <span className="font-mono text-[9px] text-avionics-label bg-avionics-panel-dark/80 px-1.5 py-0.5 rounded">
+          {connectionMode === "test" ? "TEST" : connectionMode === "flowpro" ? "FLOW PRO" : connectionMode === "websocket" ? "WS BRIDGE" : "STATIC"}
+        </span>
+      </div>
+      {/* Range indicator */}
       <div className="absolute bottom-2 left-2 z-[1000] font-mono text-[9px] text-avionics-label bg-avionics-panel-dark/80 px-1.5 py-0.5 rounded">
         20 NM
       </div>
