@@ -1,19 +1,40 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { RefreshCw } from "lucide-react";
 
-type WxTab = "radar" | "metar" | "winds" | "sigmet" | "icing";
+type WxTab = "radar" | "metar" | "taf" | "winds" | "sigmet" | "icing";
 
-const metarData = [
-  { id: "KMRY", text: "KMRY 201856Z 31012G18KT 10SM FEW025 SCT040 16/08 A3012 RMK AO2 SLP198", cat: "VFR" },
-  { id: "KSNS", text: "KSNS 201856Z 28008KT 10SM CLR 18/06 A3014 RMK AO2 SLP204", cat: "VFR" },
-  { id: "KSJC", text: "KSJC 201856Z 32015KT 6SM HZ BKN015 OVC025 14/10 A3008 RMK AO2", cat: "MVFR" },
-  { id: "KSFO", text: "KSFO 201856Z 28020G28KT 3SM BR OVC008 12/10 A3006 RMK AO2", cat: "IFR" },
-  { id: "KOAK", text: "KOAK 201856Z 30012KT 7SM SCT018 BKN025 15/09 A3010", cat: "MVFR" },
-];
+interface MetarEntry {
+  icaoId: string;
+  rawOb: string;
+  temp: number;
+  dewp: number;
+  wdir: number;
+  wspd: number;
+  wgst?: number;
+  visib: number | string;
+  altim: number;
+  fltcat: string;
+  reportTime: string;
+  clouds?: { cover: string; base: number }[];
+}
 
-const sigmetData = [
-  { id: "WS1", type: "SIGMET", text: "SIGMET CHARLIE 3 VALID UNTIL 202100 — MOD TURB BLW FL200 WI AREA BOUNDED BY SFO-SAC-FAT-SBA-SFO" },
-  { id: "WA1", type: "AIRMET", text: "AIRMET SIERRA — IFR CIG BLW 010/VIS BLW 3SM BR. NRN CA CSTL AREAS. CONDS CONTG BYD 2100Z" },
-];
+interface TafEntry {
+  icaoId: string;
+  rawTAF: string;
+  issueTime: string;
+  validTimeFrom: string;
+  validTimeTo: string;
+}
+
+const STATIONS = ["KMRY", "KSNS", "KSJC", "KSFO", "KOAK"];
+
+const catColor: Record<string, string> = {
+  VFR: "text-avionics-green",
+  MVFR: "text-avionics-cyan",
+  IFR: "text-destructive",
+  LIFR: "text-avionics-magenta",
+};
 
 const windsData = [
   { alt: "3000", dir: 310, speed: 15, temp: "+12" },
@@ -24,26 +45,67 @@ const windsData = [
   { alt: "24000", dir: 265, speed: 68, temp: "-30" },
 ];
 
-const catColor: Record<string, string> = {
-  VFR: "text-avionics-green",
-  MVFR: "text-avionics-cyan",
-  IFR: "text-destructive",
-  LIFR: "text-avionics-magenta",
-};
+const sigmetData = [
+  { id: "WS1", type: "SIGMET", text: "SIGMET CHARLIE 3 VALID UNTIL 202100 — MOD TURB BLW FL200 WI AREA BOUNDED BY SFO-SAC-FAT-SBA-SFO" },
+  { id: "WA1", type: "AIRMET", text: "AIRMET SIERRA — IFR CIG BLW 010/VIS BLW 3SM BR. NRN CA CSTL AREAS. CONDS CONTG BYD 2100Z" },
+];
 
 export const WeatherDetailScreen = () => {
-  const [activeTab, setActiveTab] = useState<WxTab>("radar");
+  const [activeTab, setActiveTab] = useState<WxTab>("metar");
+  const [metars, setMetars] = useState<MetarEntry[]>([]);
+  const [tafs, setTafs] = useState<TafEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchWeather = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('aviation-weather', {
+        body: { type: 'all', stations: STATIONS },
+      });
+
+      if (fnError) throw fnError;
+
+      if (data?.success) {
+        if (data.data.metars) setMetars(data.data.metars);
+        if (data.data.tafs) setTafs(data.data.tafs);
+        setLastUpdate(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }));
+      } else {
+        setError(data?.error || 'Failed to fetch weather');
+      }
+    } catch (err) {
+      console.error('Weather fetch error:', err);
+      setError('Unable to connect to weather service');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchWeather();
+    const interval = setInterval(fetchWeather, 5 * 60 * 1000); // refresh every 5 min
+    return () => clearInterval(interval);
+  }, [fetchWeather]);
 
   return (
     <div className="flex-1 flex flex-col bg-avionics-panel-dark overflow-hidden">
       <div className="flex items-center px-3 py-1.5 bg-avionics-panel border-b border-avionics-divider">
         <span className="font-mono text-xs text-avionics-white">Weather</span>
-        <span className="ml-auto font-mono text-[9px] text-avionics-green">NXRD:CMP</span>
+        <div className="ml-auto flex items-center gap-2">
+          {lastUpdate && (
+            <span className="font-mono text-[9px] text-avionics-green">UPD {lastUpdate}Z</span>
+          )}
+          <button onClick={fetchWeather} disabled={loading} className="hover:opacity-80 transition-opacity">
+            <RefreshCw className={`w-3 h-3 text-avionics-cyan ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
       <div className="flex items-center bg-avionics-panel border-b border-avionics-divider overflow-x-auto">
-        {([["radar", "Radar"], ["metar", "METAR"], ["winds", "Winds"], ["sigmet", "SIGMET"], ["icing", "Icing"]] as [WxTab, string][]).map(([key, label]) => (
+        {([["radar", "Radar"], ["metar", "METAR"], ["taf", "TAF"], ["winds", "Winds"], ["sigmet", "SIGMET"], ["icing", "Icing"]] as [WxTab, string][]).map(([key, label]) => (
           <button
             key={key}
             onClick={() => setActiveTab(key)}
@@ -55,6 +117,12 @@ export const WeatherDetailScreen = () => {
           </button>
         ))}
       </div>
+
+      {error && (
+        <div className="px-3 py-1.5 bg-destructive/10 border-b border-avionics-divider">
+          <span className="font-mono text-[9px] text-destructive">{error}</span>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto">
         {activeTab === "radar" && (
@@ -85,15 +153,71 @@ export const WeatherDetailScreen = () => {
 
         {activeTab === "metar" && (
           <div>
-            {metarData.map(m => (
-              <div key={m.id} className="px-3 py-2.5 border-b border-avionics-divider/30">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-mono text-xs text-avionics-white">{m.id}</span>
-                  <span className={`font-mono text-[10px] font-bold ${catColor[m.cat]}`}>{m.cat}</span>
-                </div>
-                <p className="font-mono text-[9px] text-avionics-label leading-relaxed">{m.text}</p>
+            {loading && metars.length === 0 ? (
+              <div className="px-3 py-6 text-center">
+                <span className="font-mono text-[10px] text-avionics-label">Loading METARs...</span>
               </div>
-            ))}
+            ) : metars.length > 0 ? (
+              metars.map((m, i) => (
+                <div key={`${m.icaoId}-${i}`} className="px-3 py-2.5 border-b border-avionics-divider/30">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-mono text-xs text-avionics-white">{m.icaoId}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[9px] text-avionics-label">
+                        {m.temp !== undefined ? `${m.temp}/${m.dewp}°C` : ''}
+                      </span>
+                      <span className={`font-mono text-[10px] font-bold ${catColor[m.fltcat] || 'text-avionics-label'}`}>
+                        {m.fltcat || 'UNK'}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="font-mono text-[9px] text-avionics-label leading-relaxed break-all">{m.rawOb}</p>
+                  <div className="flex items-center gap-3 mt-1">
+                    {m.wdir !== undefined && (
+                      <span className="font-mono text-[8px] text-avionics-cyan">
+                        {m.wdir === 0 ? 'VRB' : `${String(m.wdir).padStart(3, '0')}°`} {m.wspd}kt{m.wgst ? `G${m.wgst}` : ''}
+                      </span>
+                    )}
+                    {m.visib !== undefined && (
+                      <span className="font-mono text-[8px] text-avionics-green">VIS {m.visib}SM</span>
+                    )}
+                    {m.altim !== undefined && (
+                      <span className="font-mono text-[8px] text-avionics-amber">A{Math.round(m.altim * 100) / 100}</span>
+                    )}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="px-3 py-6 text-center">
+                <span className="font-mono text-[10px] text-avionics-label">No METAR data available</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "taf" && (
+          <div>
+            {loading && tafs.length === 0 ? (
+              <div className="px-3 py-6 text-center">
+                <span className="font-mono text-[10px] text-avionics-label">Loading TAFs...</span>
+              </div>
+            ) : tafs.length > 0 ? (
+              tafs.map((t, i) => (
+                <div key={`${t.icaoId}-${i}`} className="px-3 py-2.5 border-b border-avionics-divider/30">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-mono text-xs text-avionics-white">{t.icaoId}</span>
+                    <span className="font-mono text-[9px] text-avionics-label">
+                      {t.validTimeFrom?.slice(8, 10)}/{t.validTimeFrom?.slice(11, 13)}Z–{t.validTimeTo?.slice(8, 10)}/{t.validTimeTo?.slice(11, 13)}Z
+                    </span>
+                  </div>
+                  <p className="font-mono text-[9px] text-avionics-label leading-relaxed break-all whitespace-pre-wrap">{t.rawTAF}</p>
+                </div>
+              ))
+            ) : (
+              <div className="px-3 py-6 text-center">
+                <span className="font-mono text-[10px] text-avionics-label">No TAF data available</span>
+              </div>
+            )}
           </div>
         )}
 
