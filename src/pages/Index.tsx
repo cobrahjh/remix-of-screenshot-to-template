@@ -29,6 +29,7 @@ import { VcalcScreen } from "@/components/avionics/screens/VcalcScreen";
 import { TripPlanningScreen } from "@/components/avionics/screens/TripPlanningScreen";
 import { DaltScreen } from "@/components/avionics/screens/DaltScreen";
 import { ChecklistsScreen } from "@/components/avionics/screens/ChecklistsScreen";
+import { SafeTaxiScreen } from "@/components/avionics/screens/SafeTaxiScreen";
 import { PlaceholderScreen } from "@/components/avionics/screens/PlaceholderScreen";
 import { CdiBar } from "@/components/avionics/CdiBar";
 import { Home, Navigation } from "lucide-react";
@@ -86,6 +87,8 @@ const GtnDisplay = () => {
         return <DaltScreen />;
       case "checklists":
         return <ChecklistsScreen />;
+      case "safetaxi":
+        return <SafeTaxiScreen />;
       default:
         return <PlaceholderScreen page={currentPage} />;
     }
@@ -137,6 +140,7 @@ const GtnDisplay = () => {
           { label: "TRIP", page: "trip" as const },
           { label: "DALT", page: "dalt" as const },
           { label: "CHKL", page: "checklists" as const },
+          { label: "TAXI", page: "safetaxi" as const },
           { label: "SVC", page: "services" as const },
         ]).map((tab) => (
           <button
