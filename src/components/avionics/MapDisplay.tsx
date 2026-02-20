@@ -1,16 +1,28 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useGtn } from "./GtnContext";
 import { useFlightData } from "./FlightDataContext";
 
+const NEXRAD_URL = "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png";
+
+const NEXRAD_LEGEND = [
+  { color: "hsl(120 80% 35%)", label: "Light" },
+  { color: "hsl(60 90% 45%)", label: "Mod" },
+  { color: "hsl(30 100% 50%)", label: "Heavy" },
+  { color: "hsl(0 90% 50%)", label: "Extreme" },
+  { color: "hsl(300 70% 50%)", label: "Hail" },
+];
+
 export const MapDisplay = () => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
   const aircraftMarker = useRef<L.Marker | null>(null);
+  const nexradLayer = useRef<L.TileLayer | null>(null);
   const { flightPlan, activeWaypointIndex } = useGtn();
   const { flight, connectionMode } = useFlightData();
   const isLive = connectionMode !== "none";
+  const [nexradOn, setNexradOn] = useState(false);
 
   // Initialize map once
   useEffect(() => {
@@ -76,9 +88,28 @@ export const MapDisplay = () => {
     aircraftMarker.current = L.marker([flight.lat, flight.lng], { icon: aircraftIcon, zIndexOffset: 1000 }).addTo(map);
     mapInstance.current = map;
 
-    return () => { map.remove(); mapInstance.current = null; aircraftMarker.current = null; };
+    return () => { map.remove(); mapInstance.current = null; aircraftMarker.current = null; nexradLayer.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Toggle NEXRAD layer
+  useEffect(() => {
+    if (!mapInstance.current) return;
+    if (nexradOn) {
+      if (!nexradLayer.current) {
+        nexradLayer.current = L.tileLayer(NEXRAD_URL, {
+          opacity: 0.55,
+          maxZoom: 19,
+          zIndex: 500,
+        });
+      }
+      nexradLayer.current.addTo(mapInstance.current);
+    } else {
+      if (nexradLayer.current && mapInstance.current.hasLayer(nexradLayer.current)) {
+        mapInstance.current.removeLayer(nexradLayer.current);
+      }
+    }
+  }, [nexradOn]);
 
   // Update aircraft position when flight data changes
   useEffect(() => {
@@ -100,6 +131,7 @@ export const MapDisplay = () => {
   return (
     <div className="flex-1 relative overflow-hidden">
       <div ref={mapRef} className="absolute inset-0" />
+
       {/* Connection status overlay */}
       <div className="absolute top-2 left-2 z-[1000] flex items-center gap-1.5">
         <div className={`w-1.5 h-1.5 rounded-full ${isLive ? "bg-avionics-green animate-pulse" : "bg-avionics-divider"}`} />
@@ -107,6 +139,34 @@ export const MapDisplay = () => {
           {connectionMode === "test" ? "TEST" : connectionMode === "flowpro" ? "FLOW PRO" : connectionMode === "websocket" ? "WS BRIDGE" : "STATIC"}
         </span>
       </div>
+
+      {/* NEXRAD toggle */}
+      <div className="absolute top-2 right-2 z-[1000] flex flex-col items-end gap-1">
+        <button
+          onClick={() => setNexradOn(!nexradOn)}
+          className={`font-mono text-[9px] px-2 py-1 rounded border transition-colors ${
+            nexradOn
+              ? "border-avionics-green text-avionics-green bg-avionics-panel-dark/90"
+              : "border-avionics-divider text-avionics-label bg-avionics-panel-dark/80 hover:text-avionics-white"
+          }`}
+        >
+          {nexradOn ? "NXRD ON" : "NXRD OFF"}
+        </button>
+
+        {/* Legend */}
+        {nexradOn && (
+          <div className="bg-avionics-panel-dark/90 border border-avionics-divider rounded px-2 py-1.5 flex flex-col gap-0.5">
+            <span className="font-mono text-[7px] text-avionics-label mb-0.5">NEXRAD</span>
+            {NEXRAD_LEGEND.map((item) => (
+              <div key={item.label} className="flex items-center gap-1.5">
+                <div className="w-3 h-2 rounded-sm" style={{ backgroundColor: item.color }} />
+                <span className="font-mono text-[7px] text-avionics-white">{item.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Range indicator */}
       <div className="absolute bottom-2 left-2 z-[1000] font-mono text-[9px] text-avionics-label bg-avionics-panel-dark/80 px-1.5 py-0.5 rounded">
         20 NM
