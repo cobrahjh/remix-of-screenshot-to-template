@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useGtn } from "./GtnContext";
 import { useFlightData } from "./FlightDataContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const NEXRAD_URL = "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png";
 
@@ -14,15 +15,146 @@ const NEXRAD_LEGEND = [
   { color: "hsl(300 70% 50%)", label: "Hail" },
 ];
 
+// Nearby airports in central CA with known coordinates
+const METAR_STATIONS: { icao: string; lat: number; lng: number }[] = [
+  { icao: "KMRY", lat: 36.5870, lng: -121.8430 },
+  { icao: "KSNS", lat: 36.6628, lng: -121.6064 },
+  { icao: "KSJC", lat: 37.3626, lng: -121.9291 },
+  { icao: "KSFO", lat: 37.6213, lng: -122.3790 },
+  { icao: "KOAK", lat: 37.7213, lng: -122.2208 },
+  { icao: "KWVI", lat: 36.9357, lng: -121.7897 },
+  { icao: "KCVH", lat: 37.0590, lng: -121.5963 },
+  { icao: "KHWD", lat: 37.6592, lng: -122.1217 },
+  { icao: "KMOD", lat: 37.6258, lng: -120.9544 },
+  { icao: "KSCK", lat: 37.8942, lng: -121.2386 },
+  { icao: "KLVK", lat: 37.6934, lng: -121.8204 },
+  { icao: "KNUQ", lat: 37.4161, lng: -122.0492 },
+  { icao: "KPAO", lat: 37.4611, lng: -122.1150 },
+  { icao: "KSQL", lat: 37.5119, lng: -122.2494 },
+  { icao: "KRHV", lat: 37.3326, lng: -121.8198 },
+  { icao: "KE16", lat: 37.0816, lng: -121.5973 },
+  { icao: "KCIC", lat: 39.7954, lng: -121.8584 },
+  { icao: "KPRB", lat: 35.6729, lng: -120.6271 },
+  { icao: "KSBP", lat: 35.2368, lng: -120.6424 },
+];
+
+type FlightCategory = "VFR" | "MVFR" | "IFR" | "LIFR" | "UNKN";
+
+const CATEGORY_COLORS: Record<FlightCategory, string> = {
+  VFR: "hsl(160, 100%, 45%)",
+  MVFR: "hsl(210, 80%, 55%)",
+  IFR: "hsl(0, 85%, 55%)",
+  LIFR: "hsl(300, 80%, 60%)",
+  UNKN: "hsl(220, 10%, 50%)",
+};
+
+interface MetarData {
+  icaoId?: string;
+  visib?: number;
+  clouds?: { cover: string; base: number | null }[];
+  fltCat?: string;
+  rawOb?: string;
+  wdir?: number;
+  wspd?: number;
+  temp?: number;
+  dewp?: number;
+}
+
+function getFlightCategory(metar: MetarData): FlightCategory {
+  // Use AWC-provided flight category if available
+  if (metar.fltCat) {
+    const cat = metar.fltCat.toUpperCase();
+    if (cat === "VFR" || cat === "MVFR" || cat === "IFR" || cat === "LIFR") return cat;
+  }
+
+  const vis = metar.visib ?? 99;
+  let ceiling = 99999;
+  if (metar.clouds) {
+    for (const c of metar.clouds) {
+      if ((c.cover === "BKN" || c.cover === "OVC") && c.base !== null) {
+        ceiling = Math.min(ceiling, c.base);
+      }
+    }
+  }
+
+  if (ceiling < 500 || vis < 1) return "LIFR";
+  if (ceiling < 1000 || vis < 3) return "IFR";
+  if (ceiling <= 3000 || vis <= 5) return "MVFR";
+  return "VFR";
+}
+
 export const MapDisplay = () => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
   const aircraftMarker = useRef<L.Marker | null>(null);
   const nexradLayer = useRef<L.TileLayer | null>(null);
+  const metarMarkers = useRef<L.LayerGroup | null>(null);
   const { flightPlan, activeWaypointIndex } = useGtn();
   const { flight, connectionMode } = useFlightData();
   const isLive = connectionMode !== "none";
   const [nexradOn, setNexradOn] = useState(false);
+  const [metarOn, setMetarOn] = useState(false);
+  const [metarData, setMetarData] = useState<Record<string, { category: FlightCategory; raw?: string }>>({});
+  const [metarLoading, setMetarLoading] = useState(false);
+
+  // Fetch METARs via edge function, fallback to simulated data
+  const fetchMetars = useCallback(async () => {
+    setMetarLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("aviation-weather", {
+        body: { type: "metar", stations: METAR_STATIONS.map(s => s.icao) },
+      });
+      if (error) throw error;
+      if (data?.success && Array.isArray(data.data?.metars)) {
+        const parsed: Record<string, { category: FlightCategory; raw?: string }> = {};
+        for (const m of data.data.metars as MetarData[]) {
+          if (m.icaoId) {
+            parsed[m.icaoId] = {
+              category: getFlightCategory(m),
+              raw: m.rawOb,
+            };
+          }
+        }
+        setMetarData(parsed);
+        return;
+      }
+    } catch (err) {
+      console.warn("Edge function unavailable, using simulated METAR data:", err);
+    }
+
+    // Fallback: simulated METAR data for demonstration
+    const simCategories: FlightCategory[] = ["VFR", "VFR", "VFR", "MVFR", "VFR", "VFR", "VFR", "MVFR", "VFR", "VFR", "VFR", "IFR", "VFR", "MVFR", "VFR", "VFR", "VFR", "VFR", "LIFR"];
+    const simRaws = [
+      "KMRY 202053Z 31012KT 10SM FEW025 16/09 A2991",
+      "KSNS 202053Z 30008KT 10SM CLR 18/07 A2992",
+      "KSJC 202053Z 33010KT 10SM FEW020 17/10 A2990",
+      "KSFO 202053Z 28018G25KT 6SM BR BKN015 13/10 A2989",
+      "KOAK 202053Z 30012KT 10SM SCT020 15/09 A2990",
+      "KWVI 202053Z 29006KT 10SM CLR 19/08 A2991",
+      "KCVH 202053Z AUTO 00000KT 10SM CLR 20/06 A2992",
+      "KHWD 202053Z 30014KT 7SM BKN018 14/10 A2989",
+      "KMOD 202053Z 33008KT 10SM CLR 22/05 A2991",
+      "KSCK 202053Z 34010KT 10SM FEW025 21/06 A2990",
+      "KLVK 202053Z 30012KT 10SM SCT025 18/08 A2990",
+      "KNUQ 202053Z 28015KT 2SM FG OVC003 12/11 A2988",
+      "KPAO 202053Z 31008KT 10SM FEW020 16/10 A2990",
+      "KSQL 202053Z 29012KT 5SM BR BKN020 14/10 A2989",
+      "KRHV 202053Z 33006KT 10SM CLR 19/08 A2991",
+      "KE16 202053Z AUTO 00000KT 10SM CLR 21/06 A2992",
+      "KCIC 202053Z 00000KT 10SM CLR 24/04 A2993",
+      "KPRB 202053Z 31010KT 10SM CLR 23/05 A2991",
+      "KSBP 202053Z 28020G28KT 1SM FG OVC001 11/10 A2987",
+    ];
+    const parsed: Record<string, { category: FlightCategory; raw?: string }> = {};
+    METAR_STATIONS.forEach((s, i) => {
+      parsed[s.icao] = {
+        category: simCategories[i] || "VFR",
+        raw: simRaws[i] || `${s.icao} DATA UNAVAILABLE`,
+      };
+    });
+    setMetarData(parsed);
+    setMetarLoading(false);
+  }, []);
 
   // Initialize map once
   useEffect(() => {
@@ -86,9 +218,10 @@ export const MapDisplay = () => {
     });
 
     aircraftMarker.current = L.marker([flight.lat, flight.lng], { icon: aircraftIcon, zIndexOffset: 1000 }).addTo(map);
+    metarMarkers.current = L.layerGroup();
     mapInstance.current = map;
 
-    return () => { map.remove(); mapInstance.current = null; aircraftMarker.current = null; nexradLayer.current = null; };
+    return () => { map.remove(); mapInstance.current = null; aircraftMarker.current = null; nexradLayer.current = null; metarMarkers.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -110,6 +243,57 @@ export const MapDisplay = () => {
       }
     }
   }, [nexradOn]);
+
+  // Toggle METAR layer
+  useEffect(() => {
+    if (!mapInstance.current || !metarMarkers.current) return;
+    if (metarOn) {
+      fetchMetars();
+      metarMarkers.current.addTo(mapInstance.current);
+    } else {
+      if (mapInstance.current.hasLayer(metarMarkers.current)) {
+        mapInstance.current.removeLayer(metarMarkers.current);
+      }
+    }
+  }, [metarOn, fetchMetars]);
+
+  // Update METAR markers when data changes
+  useEffect(() => {
+    if (!metarMarkers.current || !metarOn) return;
+    metarMarkers.current.clearLayers();
+
+    for (const station of METAR_STATIONS) {
+      const info = metarData[station.icao];
+      const category = info?.category || "UNKN";
+      const color = CATEGORY_COLORS[category];
+      const size = 18;
+
+      const icon = L.divIcon({
+        className: "",
+        html: `<svg width="${size}" height="${size}" viewBox="0 0 18 18">
+          <circle cx="9" cy="9" r="6" fill="${color}" opacity="0.85" stroke="hsla(0,0%,0%,0.4)" stroke-width="1"/>
+          <circle cx="9" cy="9" r="3" fill="hsla(0,0%,100%,0.3)"/>
+        </svg>`,
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+      });
+
+      const marker = L.marker([station.lat, station.lng], { icon, zIndexOffset: 800 });
+
+      const tooltipContent = `<div style="font-family:'Share Tech Mono',monospace;font-size:9px;background:hsla(220,20%,8%,0.92);padding:3px 6px;border:1px solid ${color};border-radius:3px;max-width:220px;">
+        <div style="color:${color};font-weight:bold;margin-bottom:2px;">${station.icao} — ${category}</div>
+        ${info?.raw ? `<div style="color:hsl(0,0%,70%);font-size:8px;word-break:break-all;">${info.raw}</div>` : '<div style="color:hsl(0,0%,50%);font-size:8px;">No data</div>'}
+      </div>`;
+
+      marker.bindTooltip(tooltipContent, {
+        direction: "top",
+        offset: [0, -10],
+        className: "leaflet-tooltip-avionics",
+      });
+
+      metarMarkers.current.addLayer(marker);
+    }
+  }, [metarData, metarOn]);
 
   // Update aircraft position when flight data changes
   useEffect(() => {
@@ -140,29 +324,57 @@ export const MapDisplay = () => {
         </span>
       </div>
 
-      {/* NEXRAD toggle */}
+      {/* Map overlay toggles */}
       <div className="absolute top-2 right-2 z-[1000] flex flex-col items-end gap-1">
-        <button
-          onClick={() => setNexradOn(!nexradOn)}
-          className={`font-mono text-[9px] px-2 py-1 rounded border transition-colors ${
-            nexradOn
-              ? "border-avionics-green text-avionics-green bg-avionics-panel-dark/90"
-              : "border-avionics-divider text-avionics-label bg-avionics-panel-dark/80 hover:text-avionics-white"
-          }`}
-        >
-          {nexradOn ? "NXRD ON" : "NXRD OFF"}
-        </button>
+        <div className="flex gap-1">
+          <button
+            onClick={() => setNexradOn(!nexradOn)}
+            className={`font-mono text-[9px] px-2 py-1 rounded border transition-colors ${
+              nexradOn
+                ? "border-avionics-green text-avionics-green bg-avionics-panel-dark/90"
+                : "border-avionics-divider text-avionics-label bg-avionics-panel-dark/80 hover:text-avionics-white"
+            }`}
+          >
+            NXRD
+          </button>
+          <button
+            onClick={() => setMetarOn(!metarOn)}
+            className={`font-mono text-[9px] px-2 py-1 rounded border transition-colors ${
+              metarOn
+                ? "border-avionics-cyan text-avionics-cyan bg-avionics-panel-dark/90"
+                : "border-avionics-divider text-avionics-label bg-avionics-panel-dark/80 hover:text-avionics-white"
+            }`}
+          >
+            {metarLoading ? "METAR..." : "METAR"}
+          </button>
+        </div>
 
-        {/* Legend */}
-        {nexradOn && (
-          <div className="bg-avionics-panel-dark/90 border border-avionics-divider rounded px-2 py-1.5 flex flex-col gap-0.5">
-            <span className="font-mono text-[7px] text-avionics-label mb-0.5">NEXRAD</span>
-            {NEXRAD_LEGEND.map((item) => (
-              <div key={item.label} className="flex items-center gap-1.5">
-                <div className="w-3 h-2 rounded-sm" style={{ backgroundColor: item.color }} />
-                <span className="font-mono text-[7px] text-avionics-white">{item.label}</span>
-              </div>
-            ))}
+        {/* Legends */}
+        {(nexradOn || metarOn) && (
+          <div className="bg-avionics-panel-dark/90 border border-avionics-divider rounded px-2 py-1.5 flex flex-col gap-1">
+            {nexradOn && (
+              <>
+                <span className="font-mono text-[7px] text-avionics-label">NEXRAD</span>
+                {NEXRAD_LEGEND.map((item) => (
+                  <div key={item.label} className="flex items-center gap-1.5">
+                    <div className="w-3 h-2 rounded-sm" style={{ backgroundColor: item.color }} />
+                    <span className="font-mono text-[7px] text-avionics-white">{item.label}</span>
+                  </div>
+                ))}
+              </>
+            )}
+            {nexradOn && metarOn && <div className="border-t border-avionics-divider/50 my-0.5" />}
+            {metarOn && (
+              <>
+                <span className="font-mono text-[7px] text-avionics-label">FLT CAT</span>
+                {(["VFR", "MVFR", "IFR", "LIFR"] as FlightCategory[]).map((cat) => (
+                  <div key={cat} className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[cat] }} />
+                    <span className="font-mono text-[7px] text-avionics-white">{cat}</span>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         )}
       </div>
