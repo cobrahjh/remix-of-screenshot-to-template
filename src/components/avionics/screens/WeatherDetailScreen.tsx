@@ -50,6 +50,63 @@ const sigmetData = [
   { id: "WA1", type: "AIRMET", text: "AIRMET SIERRA — IFR CIG BLW 010/VIS BLW 3SM BR. NRN CA CSTL AREAS. CONDS CONTG BYD 2100Z" },
 ];
 
+// Determine flight category from visibility and ceiling
+function getFlightCategory(visibilityMiles: number, ceilingFt: number | null): string {
+  if (visibilityMiles < 1 || (ceilingFt !== null && ceilingFt < 500)) return "LIFR";
+  if (visibilityMiles < 3 || (ceilingFt !== null && ceilingFt < 1000)) return "IFR";
+  if (visibilityMiles <= 5 || (ceilingFt !== null && ceilingFt <= 3000)) return "MVFR";
+  return "VFR";
+}
+
+// Parse NOAA weather.gov observation into our MetarEntry format
+function parseNOAAObs(feature: any): MetarEntry | null {
+  try {
+    const props = feature.properties;
+    const stationId = props.station?.split("/").pop() || "";
+    const rawOb = props.rawMessage || `${stationId} ${props.textDescription || ""}`;
+    const tempC = props.temperature?.value != null ? Math.round(props.temperature.value) : 0;
+    const dewpC = props.dewpoint?.value != null ? Math.round(props.dewpoint.value) : 0;
+    const wdir = props.windDirection?.value != null ? Math.round(props.windDirection.value) : 0;
+    const wspdMs = props.windSpeed?.value || 0;
+    const wspd = Math.round(wspdMs * 1.944); // m/s to knots
+    const wgstMs = props.windGust?.value || 0;
+    const wgst = wgstMs > 0 ? Math.round(wgstMs * 1.944) : undefined;
+    const visM = props.visibility?.value || 10000;
+    const visSM = Math.round((visM / 1609.34) * 10) / 10;
+    const altimPa = props.barometricPressure?.value || 101325;
+    const altimInHg = Math.round((altimPa / 3386.39) * 100) / 100;
+
+    // Find ceiling
+    let ceilingFt: number | null = null;
+    if (props.cloudLayers) {
+      for (const layer of props.cloudLayers) {
+        if (layer.amount === "BKN" || layer.amount === "OVC") {
+          const baseFt = layer.base?.value != null ? Math.round(layer.base.value * 3.281) : null;
+          if (baseFt !== null && (ceilingFt === null || baseFt < ceilingFt)) ceilingFt = baseFt;
+        }
+      }
+    }
+
+    const fltcat = getFlightCategory(visSM, ceilingFt);
+
+    return {
+      icaoId: stationId,
+      rawOb,
+      temp: tempC,
+      dewp: dewpC,
+      wdir,
+      wspd,
+      wgst,
+      visib: visSM,
+      altim: altimInHg,
+      fltcat,
+      reportTime: props.timestamp || "",
+    };
+  } catch {
+    return null;
+  }
+}
+
 export const WeatherDetailScreen = () => {
   const [activeTab, setActiveTab] = useState<WxTab>("metar");
   const [metars, setMetars] = useState<MetarEntry[]>([]);
@@ -62,18 +119,47 @@ export const WeatherDetailScreen = () => {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('aviation-weather', {
-        body: { type: 'all', stations: STATIONS },
+      // Try edge function first, fall back to NOAA weather.gov API
+      let metarsLoaded = false;
+
+      // Attempt edge function (for when it's deployed)
+      try {
+        const { data, error: fnError } = await supabase.functions.invoke('aviation-weather', {
+          body: { type: 'all', stations: STATIONS },
+        });
+        if (!fnError && data?.success) {
+          if (Array.isArray(data.data?.metars)) { setMetars(data.data.metars); metarsLoaded = true; }
+          if (Array.isArray(data.data?.tafs)) setTafs(data.data.tafs);
+          setLastUpdate(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }));
+          setLoading(false);
+          return;
+        }
+      } catch { /* edge function not available, fall through */ }
+
+      // Fallback: NOAA weather.gov API (CORS-friendly)
+      const obsPromises = STATIONS.map(async (station) => {
+        try {
+          const res = await fetch(
+            `https://api.weather.gov/stations/${station}/observations/latest`,
+            { headers: { "User-Agent": "GTN750Xi-Avionics", Accept: "application/geo+json" } }
+          );
+          if (!res.ok) return null;
+          const data = await res.json();
+          return parseNOAAObs(data);
+        } catch { return null; }
       });
 
-      if (fnError) throw fnError;
+      const results = await Promise.all(obsPromises);
+      const validMetars = results.filter((m): m is MetarEntry => m !== null);
+      if (validMetars.length > 0) {
+        setMetars(validMetars);
+        metarsLoaded = true;
+      }
 
-      if (data?.success) {
-        if (data.data.metars) setMetars(data.data.metars);
-        if (data.data.tafs) setTafs(data.data.tafs);
+      if (metarsLoaded) {
         setLastUpdate(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }));
       } else {
-        setError(data?.error || 'Failed to fetch weather');
+        setError("No weather data available");
       }
     } catch (err) {
       console.error('Weather fetch error:', err);

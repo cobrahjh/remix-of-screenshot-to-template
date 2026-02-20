@@ -3,7 +3,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-const AWC_BASE = 'https://aviationweather.gov/api/data';
+const AWC_BASE = 'https://aviationweather.gov/api/data'; // FAA Aviation Weather Center
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
