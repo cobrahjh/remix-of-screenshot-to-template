@@ -162,7 +162,7 @@ export const MapDisplay = () => {
 
     const map = L.map(mapRef.current, {
       center: [flight.lat, flight.lng],
-      zoom: 11,
+      zoom: 7,
       zoomControl: false,
       attributionControl: false,
     });
