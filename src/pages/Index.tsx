@@ -11,13 +11,19 @@ import { HomeScreen } from "@/components/avionics/screens/HomeScreen";
 import { TrafficScreen } from "@/components/avionics/screens/TrafficScreen";
 import { TerrainScreen } from "@/components/avionics/screens/TerrainScreen";
 import { WeatherScreen } from "@/components/avionics/screens/WeatherScreen";
+import { WeatherDetailScreen } from "@/components/avionics/screens/WeatherDetailScreen";
 import { SystemScreen } from "@/components/avionics/screens/SystemScreen";
 import { UtilitiesScreen } from "@/components/avionics/screens/UtilitiesScreen";
+import { FlightPlanScreen } from "@/components/avionics/screens/FlightPlanScreen";
+import { ProceduresScreen } from "@/components/avionics/screens/ProceduresScreen";
+import { DirectToScreen } from "@/components/avionics/screens/DirectToScreen";
+import { EmergencyScreen } from "@/components/avionics/screens/EmergencyScreen";
+import { NearestScreen } from "@/components/avionics/screens/NearestScreen";
 import { PlaceholderScreen } from "@/components/avionics/screens/PlaceholderScreen";
-import { Home } from "lucide-react";
+import { Home, Navigation } from "lucide-react";
 
 const GtnDisplay = () => {
-  const { currentPage, comPanelOpen, audioPanelOpen, xpdrPanelOpen, navigateTo } = useGtn();
+  const { currentPage, comPanelOpen, audioPanelOpen, xpdrPanelOpen, navigateTo, smartGlideActive, directToTarget } = useGtn();
 
   const renderScreen = () => {
     switch (currentPage) {
@@ -36,11 +42,21 @@ const GtnDisplay = () => {
       case "terrain":
         return <TerrainScreen />;
       case "weather":
-        return <WeatherScreen />;
+        return <WeatherDetailScreen />;
       case "system":
         return <SystemScreen />;
       case "utilities":
         return <UtilitiesScreen />;
+      case "flightplan":
+        return <FlightPlanScreen />;
+      case "proc":
+        return <ProceduresScreen />;
+      case "directto":
+        return <DirectToScreen />;
+      case "emergency":
+        return <EmergencyScreen />;
+      case "nearest":
+        return <NearestScreen />;
       default:
         return <PlaceholderScreen page={currentPage} />;
     }
@@ -49,17 +65,29 @@ const GtnDisplay = () => {
   return (
     <div className="w-full max-w-md rounded-xl overflow-hidden avionics-bezel border-2 border-avionics-divider bg-avionics-panel-dark flex flex-col" style={{ height: "min(85vh, 680px)" }}>
       {/* Header */}
-      <div className="bg-avionics-panel border-b border-avionics-divider px-3 py-1 flex items-center justify-between">
+      <div className={`border-b border-avionics-divider px-3 py-1 flex items-center justify-between ${smartGlideActive ? "bg-destructive/20" : "bg-avionics-panel"}`}>
         <span className="font-body text-[10px] text-avionics-label tracking-[0.3em] uppercase font-semibold">
-          Avionics
+          {smartGlideActive ? "⚠ EMERGENCY" : "Avionics"}
         </span>
-        <button
-          onClick={() => navigateTo("home")}
-          className="flex items-center gap-1 hover:opacity-80 transition-opacity"
-        >
-          <Home className="w-3 h-3 text-avionics-cyan" />
-          <span className="text-[9px] text-avionics-cyan font-mono">HOME</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {directToTarget && (
+            <span className="font-mono text-[9px] text-avionics-magenta">D→ {directToTarget}</span>
+          )}
+          <button
+            onClick={() => navigateTo("directto")}
+            className="flex items-center gap-0.5 hover:opacity-80 transition-opacity"
+          >
+            <Navigation className="w-3 h-3 text-avionics-magenta" />
+            <span className="text-[9px] text-avionics-magenta font-mono">D→</span>
+          </button>
+          <button
+            onClick={() => navigateTo("home")}
+            className="flex items-center gap-0.5 hover:opacity-80 transition-opacity"
+          >
+            <Home className="w-3 h-3 text-avionics-cyan" />
+            <span className="text-[9px] text-avionics-cyan font-mono">HOME</span>
+          </button>
+        </div>
       </div>
 
       {/* Top frequency bar */}

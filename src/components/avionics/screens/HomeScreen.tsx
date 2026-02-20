@@ -121,6 +121,12 @@ export const HomeScreen = () => {
           page="system"
           color="bg-avionics-button"
         />
+        <AppIcon
+          icon={<AlertTriangle className="w-5 h-5 text-avionics-amber" />}
+          label="Emergency"
+          page="emergency"
+          color="bg-[hsl(0_40%_20%)]"
+        />
       </div>
 
       {/* HOME label */}
