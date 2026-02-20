@@ -25,6 +25,10 @@ import { WaypointScreen } from "@/components/avionics/screens/WaypointScreen";
 import { ServicesScreen } from "@/components/avionics/screens/ServicesScreen";
 import { FuelScreen } from "@/components/avionics/screens/FuelScreen";
 import { PfdScreen } from "@/components/avionics/screens/PfdScreen";
+import { VcalcScreen } from "@/components/avionics/screens/VcalcScreen";
+import { TripPlanningScreen } from "@/components/avionics/screens/TripPlanningScreen";
+import { DaltScreen } from "@/components/avionics/screens/DaltScreen";
+import { ChecklistsScreen } from "@/components/avionics/screens/ChecklistsScreen";
 import { PlaceholderScreen } from "@/components/avionics/screens/PlaceholderScreen";
 import { CdiBar } from "@/components/avionics/CdiBar";
 import { Home, Navigation } from "lucide-react";
@@ -74,6 +78,14 @@ const GtnDisplay = () => {
         return <FuelScreen />;
       case "pfd":
         return <PfdScreen />;
+      case "vcalc":
+        return <VcalcScreen />;
+      case "trip":
+        return <TripPlanningScreen />;
+      case "dalt":
+        return <DaltScreen />;
+      case "checklists":
+        return <ChecklistsScreen />;
       default:
         return <PlaceholderScreen page={currentPage} />;
     }
@@ -121,6 +133,10 @@ const GtnDisplay = () => {
           { label: "PROC", page: "proc" as const },
           { label: "NRST", page: "nearest" as const },
           { label: "FUEL", page: "fuel" as const },
+          { label: "VCALC", page: "vcalc" as const },
+          { label: "TRIP", page: "trip" as const },
+          { label: "DALT", page: "dalt" as const },
+          { label: "CHKL", page: "checklists" as const },
           { label: "SVC", page: "services" as const },
         ]).map((tab) => (
           <button
