@@ -7,6 +7,17 @@ import { supabase } from "@/integrations/supabase/client";
 
 const NEXRAD_URL = "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png";
 
+// Terrain elevation tile layer (Mapzen/AWS Terrain Tiles — Terrarium encoding)
+const TERRAIN_TILE_URL = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
+
+const TERRAIN_LEGEND = [
+  { color: "hsl(0, 90%, 45%)", label: "Impact (0-500 ft)" },
+  { color: "hsl(30, 100%, 50%)", label: "Caution (500-1000 ft)" },
+  { color: "hsl(50, 100%, 50%)", label: "Warning (1000-2000 ft)" },
+  { color: "hsl(120, 60%, 35%)", label: "Clear (>2000 ft)" },
+  { color: "hsl(220, 20%, 15%)", label: "Well below" },
+];
+
 const NEXRAD_LEGEND = [
   { color: "hsl(120 80% 35%)", label: "Light" },
   { color: "hsl(60 90% 45%)", label: "Mod" },
@@ -209,6 +220,7 @@ export const MapDisplay = () => {
   const airwayLayers = useRef<L.LayerGroup | null>(null);
   const procLayers = useRef<L.LayerGroup | null>(null);
   const rangeLayers = useRef<L.LayerGroup | null>(null);
+  const terrainLayer = useRef<L.GridLayer | null>(null);
   const { flightPlan, activeWaypointIndex, registerMapZoom } = useGtn();
   const { flight, connectionMode } = useFlightData();
   const isLive = connectionMode !== "none";
@@ -217,6 +229,7 @@ export const MapDisplay = () => {
   const [airwaysOn, setAirwaysOn] = useState(false);
   const [procOn, setProcOn] = useState(false);
   const [rangeOn, setRangeOn] = useState(false);
+  const [terrainOn, setTerrainOn] = useState(false);
   const [metarData, setMetarData] = useState<Record<string, { category: FlightCategory; raw?: string }>>({});
   const [metarLoading, setMetarLoading] = useState(false);
 
@@ -353,7 +366,7 @@ export const MapDisplay = () => {
       () => map.zoomOut(),
     );
 
-    return () => { map.remove(); mapInstance.current = null; aircraftMarker.current = null; nexradLayer.current = null; metarMarkers.current = null; airwayLayers.current = null; procLayers.current = null; rangeLayers.current = null; };
+    return () => { map.remove(); mapInstance.current = null; aircraftMarker.current = null; nexradLayer.current = null; metarMarkers.current = null; airwayLayers.current = null; procLayers.current = null; rangeLayers.current = null; terrainLayer.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -524,6 +537,90 @@ export const MapDisplay = () => {
     }
   }, [rangeOn, flight.lat, flight.lng]);
 
+  // Toggle Terrain Awareness layer
+  useEffect(() => {
+    if (!mapInstance.current) return;
+    if (terrainOn) {
+      if (terrainLayer.current) {
+        mapInstance.current.removeLayer(terrainLayer.current);
+      }
+
+      const ownAlt = flight.altitude; // feet MSL
+
+      const TerrainGrid = L.GridLayer.extend({
+        createTile(coords: { x: number; y: number; z: number }, done: (err: Error | null, tile: HTMLCanvasElement) => void) {
+          const tile = document.createElement("canvas");
+          tile.width = 256;
+          tile.height = 256;
+          const ctx = tile.getContext("2d")!;
+
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.src = TERRAIN_TILE_URL
+            .replace("{z}", String(coords.z))
+            .replace("{x}", String(coords.x))
+            .replace("{y}", String(coords.y));
+
+          img.onload = () => {
+            ctx.drawImage(img, 0, 0, 256, 256);
+            const imageData = ctx.getImageData(0, 0, 256, 256);
+            const data = imageData.data;
+
+            for (let i = 0; i < data.length; i += 4) {
+              const r = data[i], g = data[i + 1], b = data[i + 2];
+              // Terrarium encoding: elevation = (r * 256 + g + b / 256) - 32768  (meters)
+              const elevM = (r * 256 + g + b / 256) - 32768;
+              const elevFt = elevM * 3.28084;
+              const diff = ownAlt - elevFt; // positive = we're above terrain
+
+              let cr: number, cg: number, cb: number, ca: number;
+              if (elevFt <= 0) {
+                // Water / below sea level — transparent
+                cr = 0; cg = 0; cb = 0; ca = 0;
+              } else if (diff < 500) {
+                // Impact zone — red
+                cr = 200; cg = 30; cb = 30; ca = 160;
+              } else if (diff < 1000) {
+                // Caution — orange
+                cr = 230; cg = 130; cb = 20; ca = 140;
+              } else if (diff < 2000) {
+                // Warning — yellow
+                cr = 220; cg = 200; cb = 30; ca = 100;
+              } else if (diff < 4000) {
+                // Clear — dark green
+                cr = 40; cg = 120; cb = 50; ca = 70;
+              } else {
+                // Well below — dark blue-gray
+                cr = 25; cg = 30; cb = 45; ca = 40;
+              }
+
+              data[i] = cr;
+              data[i + 1] = cg;
+              data[i + 2] = cb;
+              data[i + 3] = ca;
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+            done(null as unknown as Error, tile);
+          };
+          img.onerror = () => {
+            done(null as unknown as Error, tile);
+          };
+          return tile;
+        },
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      terrainLayer.current = new (TerrainGrid as any)({ maxZoom: 14, opacity: 0.7, zIndex: 400 }) as L.GridLayer;
+      terrainLayer.current!.addTo(mapInstance.current);
+    } else {
+      if (terrainLayer.current && mapInstance.current.hasLayer(terrainLayer.current)) {
+        mapInstance.current.removeLayer(terrainLayer.current);
+        terrainLayer.current = null;
+      }
+    }
+  }, [terrainOn, flight.altitude]);
+
   // Toggle METAR layer
   useEffect(() => {
     if (!mapInstance.current || !metarMarkers.current) return;
@@ -657,10 +754,20 @@ export const MapDisplay = () => {
           >
             RNG
           </button>
+          <button
+            onClick={() => setTerrainOn(!terrainOn)}
+            className={`font-mono text-[9px] px-2 py-1 rounded border transition-colors ${
+              terrainOn
+                ? "border-destructive text-destructive bg-avionics-panel-dark/90"
+                : "border-avionics-divider text-avionics-label bg-avionics-panel-dark/80 hover:text-avionics-white"
+            }`}
+          >
+            TERR
+          </button>
         </div>
 
         {/* Legends */}
-        {(nexradOn || metarOn || airwaysOn || procOn) && (
+        {(nexradOn || metarOn || airwaysOn || procOn || terrainOn) && (
           <div className="bg-avionics-panel-dark/90 border border-avionics-divider rounded px-2 py-1.5 flex flex-col gap-1 max-h-[200px] overflow-auto">
             {nexradOn && (
               <>
@@ -705,6 +812,18 @@ export const MapDisplay = () => {
                   <div key={p.id} className="flex items-center gap-1.5">
                     <div className="w-4 h-0.5 rounded" style={{ backgroundColor: p.color, borderStyle: p.type === "STAR" ? "dashed" : "solid" }} />
                     <span className="font-mono text-[7px] text-avionics-white">{p.type === "SID" ? "▲" : "▼"} {p.id}</span>
+                  </div>
+                ))}
+              </>
+            )}
+            {(nexradOn || metarOn || airwaysOn || procOn) && terrainOn && <div className="border-t border-avionics-divider/50 my-0.5" />}
+            {terrainOn && (
+              <>
+                <span className="font-mono text-[7px] text-avionics-label">TERRAIN ({flight.altitude} ft)</span>
+                {TERRAIN_LEGEND.map((item) => (
+                  <div key={item.label} className="flex items-center gap-1.5">
+                    <div className="w-3 h-2 rounded-sm" style={{ backgroundColor: item.color }} />
+                    <span className="font-mono text-[7px] text-avionics-white">{item.label}</span>
                   </div>
                 ))}
               </>
