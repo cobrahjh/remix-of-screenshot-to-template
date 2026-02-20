@@ -116,7 +116,7 @@ export const MapDisplay = () => {
   const nexradLayer = useRef<L.TileLayer | null>(null);
   const metarMarkers = useRef<L.LayerGroup | null>(null);
   const airwayLayers = useRef<L.LayerGroup | null>(null);
-  const { flightPlan, activeWaypointIndex } = useGtn();
+  const { flightPlan, activeWaypointIndex, registerMapZoom } = useGtn();
   const { flight, connectionMode } = useFlightData();
   const isLive = connectionMode !== "none";
   const [nexradOn, setNexradOn] = useState(false);
@@ -249,6 +249,12 @@ export const MapDisplay = () => {
     metarMarkers.current = L.layerGroup();
     airwayLayers.current = L.layerGroup();
     mapInstance.current = map;
+
+    // Register zoom controls with GtnContext
+    registerMapZoom(
+      () => map.zoomIn(),
+      () => map.zoomOut(),
+    );
 
     return () => { map.remove(); mapInstance.current = null; aircraftMarker.current = null; nexradLayer.current = null; metarMarkers.current = null; airwayLayers.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
