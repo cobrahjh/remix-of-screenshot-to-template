@@ -19,7 +19,9 @@ import { ProceduresScreen } from "@/components/avionics/screens/ProceduresScreen
 import { DirectToScreen } from "@/components/avionics/screens/DirectToScreen";
 import { EmergencyScreen } from "@/components/avionics/screens/EmergencyScreen";
 import { NearestScreen } from "@/components/avionics/screens/NearestScreen";
+import { ChartsScreen } from "@/components/avionics/screens/ChartsScreen";
 import { PlaceholderScreen } from "@/components/avionics/screens/PlaceholderScreen";
+import { CdiBar } from "@/components/avionics/CdiBar";
 import { Home, Navigation } from "lucide-react";
 
 const GtnDisplay = () => {
@@ -57,6 +59,8 @@ const GtnDisplay = () => {
         return <EmergencyScreen />;
       case "nearest":
         return <NearestScreen />;
+      case "charts":
+        return <ChartsScreen />;
       default:
         return <PlaceholderScreen page={currentPage} />;
     }
@@ -96,6 +100,7 @@ const GtnDisplay = () => {
       {/* Main content area */}
       <div className="flex-1 flex flex-col relative overflow-hidden">
         {renderScreen()}
+        {currentPage === "map" && <CdiBar />}
         {comPanelOpen && <ComPanel />}
         {audioPanelOpen && <AudioPanel />}
         {xpdrPanelOpen && <XpdrPanel />}
