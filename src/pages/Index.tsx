@@ -100,6 +100,34 @@ const GtnDisplay = () => {
         </div>
       </div>
 
+      {/* Page locator bar */}
+      <div className="flex items-center bg-avionics-panel-dark border-b border-avionics-divider px-1 overflow-x-auto">
+        {([
+          { label: "NAV MAP", page: "map" as const },
+          { label: "FPL", page: "flightplan" as const },
+          { label: "TRFC", page: "traffic" as const },
+          { label: "TERR", page: "terrain" as const },
+          { label: "WX", page: "weather" as const },
+          { label: "WPT", page: "waypoint" as const },
+          { label: "CHRT", page: "charts" as const },
+          { label: "PROC", page: "proc" as const },
+          { label: "NRST", page: "nearest" as const },
+          { label: "SVC", page: "services" as const },
+        ]).map((tab) => (
+          <button
+            key={tab.page}
+            onClick={() => navigateTo(tab.page)}
+            className={`px-1.5 py-[3px] text-[8px] font-mono whitespace-nowrap transition-colors ${
+              currentPage === tab.page
+                ? "text-avionics-cyan bg-avionics-button border-b border-avionics-cyan"
+                : "text-avionics-label hover:text-avionics-white"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {/* Top frequency bar */}
       <TopBar />
 
