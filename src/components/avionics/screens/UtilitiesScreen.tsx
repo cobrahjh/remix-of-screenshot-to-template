@@ -1,6 +1,119 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 
 type TimerId = "flight" | "elapsed" | "countdown";
+
+/* ─── Fuel Planner ─── */
+const FuelPlanner = () => {
+  const [fuelOnboard, setFuelOnboard] = useState(48); // gallons
+  const [burnRate, setBurnRate] = useState(10.5); // gph
+  const [groundSpeed, setGroundSpeed] = useState(125); // kts
+  const [reserve, setReserve] = useState(6); // gallons reserve
+
+  const stats = useMemo(() => {
+    const usable = Math.max(0, fuelOnboard - reserve);
+    const enduranceHrs = burnRate > 0 ? usable / burnRate : 0;
+    const enduranceMin = enduranceHrs * 60;
+    const rangeNm = groundSpeed * enduranceHrs;
+    const totalEnduranceHrs = burnRate > 0 ? fuelOnboard / burnRate : 0;
+    const reserveTime = burnRate > 0 ? reserve / burnRate : 0;
+    const fuelPercent = fuelOnboard > 0 ? Math.min(1, usable / fuelOnboard) : 0;
+    return { usable, enduranceHrs, enduranceMin, rangeNm, totalEnduranceHrs, reserveTime, fuelPercent };
+  }, [fuelOnboard, burnRate, groundSpeed, reserve]);
+
+  const formatEndurance = (hrs: number) => {
+    const h = Math.floor(hrs);
+    const m = Math.round((hrs - h) * 60);
+    return `${h}:${m.toString().padStart(2, "0")}`;
+  };
+
+  const isLow = stats.enduranceMin < 45;
+  const isCritical = stats.enduranceMin < 20;
+
+  const InputRow = ({ label, value, onChange, unit, step = 1, min = 0, max = 999 }: {
+    label: string; value: number; onChange: (v: number) => void; unit: string; step?: number; min?: number; max?: number;
+  }) => (
+    <div className="flex items-center justify-between px-3 py-1.5 border-b border-avionics-divider/30">
+      <span className="text-[9px] text-avionics-label font-mono w-24">{label}</span>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => onChange(Math.max(min, +(value - step).toFixed(1)))}
+          className="w-5 h-5 flex items-center justify-center rounded text-[10px] font-mono bg-avionics-button text-avionics-cyan avionics-bezel hover:bg-avionics-button-hover"
+        >−</button>
+        <span className="font-mono text-sm text-avionics-green avionics-glow-green w-14 text-center font-bold">
+          {value.toFixed(step < 1 ? 1 : 0)}
+        </span>
+        <button
+          onClick={() => onChange(Math.min(max, +(value + step).toFixed(1)))}
+          className="w-5 h-5 flex items-center justify-center rounded text-[10px] font-mono bg-avionics-button text-avionics-cyan avionics-bezel hover:bg-avionics-button-hover"
+        >+</button>
+        <span className="text-[8px] text-avionics-label font-mono w-8">{unit}</span>
+      </div>
+    </div>
+  );
+
+  return (
+    <div>
+      <InputRow label="FUEL ONBOARD" value={fuelOnboard} onChange={setFuelOnboard} unit="GAL" step={1} max={200} />
+      <InputRow label="BURN RATE" value={burnRate} onChange={setBurnRate} unit="GPH" step={0.5} max={50} />
+      <InputRow label="GROUND SPD" value={groundSpeed} onChange={setGroundSpeed} unit="KTS" step={5} max={300} />
+      <InputRow label="RESERVE" value={reserve} onChange={setReserve} unit="GAL" step={1} max={fuelOnboard} />
+
+      {/* Fuel gauge bar */}
+      <div className="px-3 py-2 border-b border-avionics-divider/30">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-[8px] text-avionics-label font-mono">FUEL</span>
+          <div className="flex-1 h-2 bg-avionics-divider rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${
+                isCritical ? "bg-red-500" : isLow ? "bg-avionics-amber" : "bg-avionics-green"
+              }`}
+              style={{ width: `${stats.fuelPercent * 100}%` }}
+            />
+          </div>
+          <span className="text-[8px] text-avionics-label font-mono w-8 text-right">
+            {Math.round(stats.fuelPercent * 100)}%
+          </span>
+        </div>
+        {/* Reserve portion indicator */}
+        <div className="flex items-center gap-2">
+          <span className="text-[8px] text-avionics-label font-mono">RSRV</span>
+          <div className="flex-1 h-1 bg-avionics-divider rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full bg-avionics-amber/60"
+              style={{ width: `${fuelOnboard > 0 ? (reserve / fuelOnboard) * 100 : 0}%` }}
+            />
+          </div>
+          <span className="text-[8px] text-avionics-label font-mono w-8 text-right">{reserve}G</span>
+        </div>
+      </div>
+
+      {/* Computed results */}
+      <div className="grid grid-cols-2 gap-px bg-avionics-divider/30">
+        {[
+          { label: "ENDURANCE", value: formatEndurance(stats.enduranceHrs), unit: "h:mm", color: isCritical ? "text-red-500" : isLow ? "text-avionics-amber" : "text-avionics-green" },
+          { label: "RANGE", value: Math.round(stats.rangeNm).toString(), unit: "NM", color: "text-avionics-cyan" },
+          { label: "TOTAL ENDUR", value: formatEndurance(stats.totalEnduranceHrs), unit: "h:mm", color: "text-avionics-white" },
+          { label: "RSRV TIME", value: formatEndurance(stats.reserveTime), unit: "h:mm", color: "text-avionics-amber" },
+        ].map(({ label, value, unit, color }) => (
+          <div key={label} className="flex flex-col items-center py-2 bg-avionics-panel-dark">
+            <span className="text-[7px] text-avionics-label font-mono">{label}</span>
+            <span className={`font-mono text-lg font-bold ${color}`}>{value}</span>
+            <span className="text-[7px] text-avionics-label font-mono">{unit}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Low fuel warning */}
+      {isLow && (
+        <div className={`flex items-center justify-center gap-1.5 px-3 py-1.5 ${isCritical ? "bg-red-500/10" : "bg-avionics-amber/10"}`}>
+          <span className={`font-mono text-[10px] font-bold ${isCritical ? "text-red-500 animate-pulse" : "text-avionics-amber"}`}>
+            ⚠ {isCritical ? "FUEL CRITICAL" : "LOW FUEL"} — {Math.round(stats.enduranceMin)} MIN REMAINING
+          </span>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const formatTime = (seconds: number) => {
   const neg = seconds < 0;
@@ -129,7 +242,7 @@ export const UtilitiesScreen = () => {
         </span>
       </div>
 
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col overflow-y-auto">
         {/* Section label */}
         <div className="px-3 py-1.5 border-b border-avionics-divider">
           <span className="text-[10px] text-avionics-cyan font-mono">FLIGHT TIMERS</span>
@@ -228,13 +341,11 @@ export const UtilitiesScreen = () => {
           );
         })}
 
-        {/* Scheduled Messages */}
+        {/* Fuel Planner */}
         <div className="px-3 py-1.5 border-b border-avionics-divider mt-1">
-          <span className="text-[10px] text-avionics-cyan font-mono">SCHEDULED MESSAGES</span>
+          <span className="text-[10px] text-avionics-cyan font-mono">FUEL PLANNER</span>
         </div>
-        <div className="flex items-center justify-center py-4">
-          <span className="font-mono text-[10px] text-avionics-divider">No Messages Configured</span>
-        </div>
+        <FuelPlanner />
       </div>
     </div>
   );
