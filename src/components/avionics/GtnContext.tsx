@@ -11,6 +11,8 @@ export interface FlightPlanWaypoint {
   alt?: number;
   ete: string;
   active?: boolean;
+  lat: number;
+  lng: number;
 }
 
 interface ComState {
@@ -85,14 +87,14 @@ export const useGtn = () => {
 };
 
 const defaultFlightPlan: FlightPlanWaypoint[] = [
-  { id: "1", name: "KSNS", type: "airport", dtk: 315, dis: 0, alt: 137, ete: "00:00", active: false },
-  { id: "2", name: "MANNA", type: "fix", dtk: 315, dis: 12, alt: 3000, ete: "06:24", active: false },
-  { id: "3", name: "GIPVY", type: "fix", dtk: 298, dis: 18, alt: 3000, ete: "09:36", active: true },
-  { id: "4", name: "JELCO", type: "fix", dtk: 285, dis: 8, alt: 2500, ete: "04:16", active: false },
-  { id: "5", name: "SISGY", type: "fix", dtk: 270, dis: 6, alt: 2000, ete: "03:12", active: false },
-  { id: "6", name: "RW31", type: "fix", dtk: 315, dis: 4, alt: 1500, ete: "02:08", active: false },
-  { id: "7", name: "MAFAF", type: "fix", dtk: 315, dis: 2, alt: 500, ete: "01:04", active: false },
-  { id: "8", name: "KMRY", type: "airport", dtk: 315, dis: 1, alt: 257, ete: "00:32", active: false },
+  { id: "1", name: "KSNS", type: "airport", dtk: 315, dis: 0, alt: 137, ete: "00:00", active: false, lat: 36.6628, lng: -121.6064 },
+  { id: "2", name: "MANNA", type: "fix", dtk: 315, dis: 12, alt: 3000, ete: "06:24", active: false, lat: 36.7200, lng: -121.7100 },
+  { id: "3", name: "GIPVY", type: "fix", dtk: 298, dis: 18, alt: 3000, ete: "09:36", active: true, lat: 36.7600, lng: -121.8200 },
+  { id: "4", name: "JELCO", type: "fix", dtk: 285, dis: 8, alt: 2500, ete: "04:16", active: false, lat: 36.7900, lng: -121.8700 },
+  { id: "5", name: "SISGY", type: "fix", dtk: 270, dis: 6, alt: 2000, ete: "03:12", active: false, lat: 36.8100, lng: -121.9000 },
+  { id: "6", name: "RW31", type: "fix", dtk: 315, dis: 4, alt: 1500, ete: "02:08", active: false, lat: 36.5700, lng: -121.8400 },
+  { id: "7", name: "MAFAF", type: "fix", dtk: 315, dis: 2, alt: 500, ete: "01:04", active: false, lat: 36.5900, lng: -121.8600 },
+  { id: "8", name: "KMRY", type: "airport", dtk: 315, dis: 1, alt: 257, ete: "00:32", active: false, lat: 36.5870, lng: -121.8430 },
 ];
 
 export const GtnProvider = ({ children }: { children: React.ReactNode }) => {
