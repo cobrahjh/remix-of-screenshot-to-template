@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Plane } from "lucide-react";
+import { useGtn } from "../GtnContext";
 
 type WxTab = "radar" | "metar" | "taf" | "winds" | "sigmet" | "icing";
 
@@ -27,7 +28,7 @@ interface TafEntry {
   validTimeTo: string;
 }
 
-const STATIONS = ["KMRY", "KSNS", "KSJC", "KSFO", "KOAK"];
+const DEFAULT_STATIONS = ["KMRY", "KSNS", "KSJC", "KSFO", "KOAK"];
 
 const catColor: Record<string, string> = {
   VFR: "text-avionics-green",
@@ -114,18 +115,42 @@ export const WeatherDetailScreen = () => {
   const [loading, setLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { flightPlan } = useGtn();
+
+  // Derive stations from flight plan airports, supplemented by defaults
+  const stations = useMemo(() => {
+    const fpAirports = flightPlan
+      .filter(wp => wp.type === "airport")
+      .map(wp => wp.name.toUpperCase());
+    // Merge flight plan airports (priority) with defaults, deduplicated
+    const merged = [...fpAirports];
+    for (const s of DEFAULT_STATIONS) {
+      if (!merged.includes(s)) merged.push(s);
+    }
+    return merged;
+  }, [flightPlan]);
+
+  // Identify departure and destination from flight plan
+  const departure = useMemo(() => {
+    const airports = flightPlan.filter(wp => wp.type === "airport");
+    return airports.length > 0 ? airports[0].name.toUpperCase() : null;
+  }, [flightPlan]);
+
+  const destination = useMemo(() => {
+    const airports = flightPlan.filter(wp => wp.type === "airport");
+    return airports.length > 1 ? airports[airports.length - 1].name.toUpperCase() : null;
+  }, [flightPlan]);
 
   const fetchWeather = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // Try edge function first, fall back to NOAA weather.gov API
       let metarsLoaded = false;
 
-      // Attempt edge function (for when it's deployed)
+      // Attempt edge function first
       try {
         const { data, error: fnError } = await supabase.functions.invoke('aviation-weather', {
-          body: { type: 'all', stations: STATIONS },
+          body: { type: 'all', stations },
         });
         if (!fnError && data?.success) {
           if (Array.isArray(data.data?.metars)) { setMetars(data.data.metars); metarsLoaded = true; }
@@ -137,7 +162,7 @@ export const WeatherDetailScreen = () => {
       } catch { /* edge function not available, fall through */ }
 
       // Fallback: NOAA weather.gov API (CORS-friendly)
-      const obsPromises = STATIONS.map(async (station) => {
+      const obsPromises = stations.map(async (station) => {
         try {
           const res = await fetch(
             `https://api.weather.gov/stations/${station}/observations/latest`,
@@ -167,7 +192,7 @@ export const WeatherDetailScreen = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [stations]);
 
   useEffect(() => {
     fetchWeather();
@@ -179,6 +204,12 @@ export const WeatherDetailScreen = () => {
     <div className="flex-1 flex flex-col bg-avionics-panel-dark overflow-hidden">
       <div className="flex items-center px-3 py-1.5 bg-avionics-panel border-b border-avionics-divider">
         <span className="font-mono text-xs text-avionics-white">Weather</span>
+        {departure && destination && (
+          <div className="flex items-center gap-1 ml-2">
+            <Plane className="w-2.5 h-2.5 text-avionics-magenta" />
+            <span className="font-mono text-[9px] text-avionics-magenta">{departure}→{destination}</span>
+          </div>
+        )}
         <div className="ml-auto flex items-center gap-2">
           {lastUpdate && (
             <span className="font-mono text-[9px] text-avionics-green">UPD {lastUpdate}Z</span>
@@ -245,9 +276,20 @@ export const WeatherDetailScreen = () => {
               </div>
             ) : metars.length > 0 ? (
               metars.map((m, i) => (
-                <div key={`${m.icaoId}-${i}`} className="px-3 py-2.5 border-b border-avionics-divider/30">
+                <div key={`${m.icaoId}-${i}`} className={`px-3 py-2.5 border-b border-avionics-divider/30 ${
+                  m.icaoId === destination ? "bg-avionics-magenta/5 border-l-2 border-l-avionics-magenta" :
+                  m.icaoId === departure ? "bg-avionics-cyan/5 border-l-2 border-l-avionics-cyan" : ""
+                }`}>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-mono text-xs text-avionics-white">{m.icaoId}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono text-xs text-avionics-white">{m.icaoId}</span>
+                      {m.icaoId === destination && (
+                        <span className="font-mono text-[7px] px-1 py-0.5 rounded bg-avionics-magenta/20 text-avionics-magenta">DEST</span>
+                      )}
+                      {m.icaoId === departure && (
+                        <span className="font-mono text-[7px] px-1 py-0.5 rounded bg-avionics-cyan/20 text-avionics-cyan">DEP</span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-[9px] text-avionics-label">
                         {m.temp !== undefined ? `${m.temp}/${m.dewp}°C` : ''}
