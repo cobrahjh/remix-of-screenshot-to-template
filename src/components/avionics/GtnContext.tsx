@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
 
-export type GtnPage = "map" | "home" | "traffic" | "terrain" | "weather" | "charts" | "flightplan" | "proc" | "nearest" | "waypoint" | "services" | "utilities" | "system" | "directto" | "emergency" | "fuel" | "pfd" | "vcalc" | "trip" | "dalt" | "checklists";
+export type GtnPage = "map" | "home" | "traffic" | "terrain" | "weather" | "charts" | "flightplan" | "proc" | "nearest" | "waypoint" | "services" | "utilities" | "system" | "directto" | "emergency" | "fuel" | "pfd" | "vcalc" | "trip" | "dalt" | "checklists" | "safetaxi";
 
 export interface FlightPlanWaypoint {
   id: string;
