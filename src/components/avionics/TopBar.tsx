@@ -10,7 +10,7 @@ interface FrequencyDisplayProps {
 
 const FrequencyDisplay = ({ label, activeFreq, standbyFreq, standbyLabel, onStandbyClick }: FrequencyDisplayProps) => (
   <div className="flex flex-col gap-0.5">
-    <div className="flex items-center gap-2">
+    <div className="flex items-baseline gap-2">
       <span className="text-[10px] text-avionics-label uppercase tracking-wider">{label}</span>
       <span className="font-mono text-lg text-avionics-green avionics-glow-green font-bold leading-none">
         {activeFreq}
