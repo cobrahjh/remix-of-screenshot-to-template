@@ -1,11 +1,29 @@
 import { useGtn } from "./GtnContext";
+import { useState, useEffect, useRef } from "react";
 
 export const CdiBar = () => {
   const { obsMode, obsCourse, directToTarget, flightPlan, activeWaypointIndex } = useGtn();
 
-  // Simulated CDI deviation values (-1 to 1, where 0 = on course)
-  const lateralDev = 0.15; // slightly right of course
-  const verticalDev = -0.25; // slightly below glidepath
+  // Animated CDI deviation using smooth sine-based drift
+  const [lateralDev, setLateralDev] = useState(0.15);
+  const [verticalDev, setVerticalDev] = useState(-0.1);
+  const timeRef = useRef(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      timeRef.current += 0.05;
+      const t = timeRef.current;
+      // Lateral: slow drift with slight oscillation, simulating course corrections
+      setLateralDev(
+        Math.sin(t * 0.7) * 0.35 + Math.sin(t * 1.9) * 0.15 + Math.sin(t * 0.3) * 0.1
+      );
+      // Vertical: gentler movement, tracking glideslope
+      setVerticalDev(
+        Math.sin(t * 0.5 + 1) * 0.25 + Math.sin(t * 1.3) * 0.1
+      );
+    }, 60);
+    return () => clearInterval(interval);
+  }, []);
 
   const activeWp = flightPlan[activeWaypointIndex];
   const courseTo = directToTarget || activeWp?.name || "---";
@@ -33,9 +51,9 @@ export const CdiBar = () => {
           ))}
           {/* Needle */}
           <div
-            className="absolute top-0 h-3 w-[2px] bg-avionics-magenta rounded"
+            className="absolute top-0 h-3 w-[2px] bg-avionics-magenta rounded transition-[left] duration-75 ease-out"
             style={{
-              left: `calc(50% + ${lateralDev * 45}%)`,
+              left: `calc(50% + ${Math.max(-1, Math.min(1, lateralDev)) * 45}%)`,
               transform: "translateX(-50%)",
             }}
           />
@@ -58,9 +76,9 @@ export const CdiBar = () => {
             />
           ))}
           <div
-            className="absolute top-0 h-3 w-[2px] bg-avionics-green rounded"
+            className="absolute top-0 h-3 w-[2px] bg-avionics-green rounded transition-[left] duration-75 ease-out"
             style={{
-              left: `calc(50% + ${verticalDev * 45}%)`,
+              left: `calc(50% + ${Math.max(-1, Math.min(1, verticalDev)) * 45}%)`,
               transform: "translateX(-50%)",
             }}
           />
