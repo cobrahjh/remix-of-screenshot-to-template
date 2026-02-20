@@ -56,7 +56,7 @@ export const TopBar = () => {
       </button>
 
       {/* MIC/MON */}
-      <div className="flex flex-col items-start justify-center px-2 py-1.5 border-r border-avionics-divider gap-0.5">
+      <div className="flex flex-col items-end justify-center px-2 py-1.5 border-r border-avionics-divider gap-0.5">
         <div className="flex items-center gap-1">
           <span className="text-[8px] text-avionics-label">MIC</span>
           <span className="bg-avionics-green text-primary-foreground text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-sm">1</span>
