@@ -20,6 +20,7 @@ import { DirectToScreen } from "@/components/avionics/screens/DirectToScreen";
 import { EmergencyScreen } from "@/components/avionics/screens/EmergencyScreen";
 import { NearestScreen } from "@/components/avionics/screens/NearestScreen";
 import { ChartsScreen } from "@/components/avionics/screens/ChartsScreen";
+import { WaypointScreen } from "@/components/avionics/screens/WaypointScreen";
 import { PlaceholderScreen } from "@/components/avionics/screens/PlaceholderScreen";
 import { CdiBar } from "@/components/avionics/CdiBar";
 import { Home, Navigation } from "lucide-react";
@@ -61,6 +62,8 @@ const GtnDisplay = () => {
         return <NearestScreen />;
       case "charts":
         return <ChartsScreen />;
+      case "waypoint":
+        return <WaypointScreen />;
       default:
         return <PlaceholderScreen page={currentPage} />;
     }
