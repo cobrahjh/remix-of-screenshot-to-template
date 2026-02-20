@@ -98,6 +98,63 @@ const VICTOR_AIRWAYS: { id: string; color: string; waypoints: { id: string; lat:
   },
 ];
 
+// SIDs and STARs for KLAX
+type ProcType = "SID" | "STAR";
+const PROCEDURES: { id: string; type: ProcType; airport: string; color: string; waypoints: { id: string; lat: number; lng: number; alt?: string }[] }[] = [
+  {
+    id: "DOTSS2",
+    type: "SID",
+    airport: "KLAX",
+    color: "hsl(160, 100%, 50%)",
+    waypoints: [
+      { id: "KLAX", lat: 33.9425, lng: -118.4081 },
+      { id: "WAYVE", lat: 33.8500, lng: -118.5200, alt: "FL190" },
+      { id: "SUMMR", lat: 33.7200, lng: -118.7000, alt: "FL230" },
+      { id: "DOTSS", lat: 33.5500, lng: -118.9500, alt: "FL240" },
+      { id: "CHRCL", lat: 33.3200, lng: -119.3000, alt: "FL250" },
+    ],
+  },
+  {
+    id: "SEAVU1",
+    type: "SID",
+    airport: "KLAX",
+    color: "hsl(80, 90%, 50%)",
+    waypoints: [
+      { id: "KLAX", lat: 33.9425, lng: -118.4081 },
+      { id: "HOLTZ", lat: 34.0600, lng: -118.2200, alt: "5000" },
+      { id: "LIMBO", lat: 34.2500, lng: -117.9500, alt: "10000" },
+      { id: "SEAVU", lat: 34.4500, lng: -117.6500, alt: "FL190" },
+      { id: "HESPD", lat: 34.7300, lng: -117.3200, alt: "FL240" },
+    ],
+  },
+  {
+    id: "SADDE6",
+    type: "STAR",
+    airport: "KLAX",
+    color: "hsl(30, 100%, 55%)",
+    waypoints: [
+      { id: "SADDE", lat: 35.5000, lng: -118.1000, alt: "FL280" },
+      { id: "GRAMM", lat: 35.1000, lng: -118.0500, alt: "FL250" },
+      { id: "FICKY", lat: 34.7000, lng: -118.1000, alt: "16000" },
+      { id: "SYMON", lat: 34.3800, lng: -118.2200, alt: "12000" },
+      { id: "KLAX", lat: 33.9425, lng: -118.4081, alt: "ILS" },
+    ],
+  },
+  {
+    id: "KIMMO3",
+    type: "STAR",
+    airport: "KLAX",
+    color: "hsl(0, 85%, 55%)",
+    waypoints: [
+      { id: "KIMMO", lat: 34.1000, lng: -117.0000, alt: "FL260" },
+      { id: "BULMA", lat: 34.0500, lng: -117.3500, alt: "FL230" },
+      { id: "ROOBY", lat: 34.0200, lng: -117.7000, alt: "15000" },
+      { id: "BAYST", lat: 33.9800, lng: -118.0500, alt: "10000" },
+      { id: "KLAX", lat: 33.9425, lng: -118.4081, alt: "ILS" },
+    ],
+  },
+];
+
 type FlightCategory = "VFR" | "MVFR" | "IFR" | "LIFR" | "UNKN";
 
 const CATEGORY_COLORS: Record<FlightCategory, string> = {
@@ -150,12 +207,14 @@ export const MapDisplay = () => {
   const nexradLayer = useRef<L.TileLayer | null>(null);
   const metarMarkers = useRef<L.LayerGroup | null>(null);
   const airwayLayers = useRef<L.LayerGroup | null>(null);
+  const procLayers = useRef<L.LayerGroup | null>(null);
   const { flightPlan, activeWaypointIndex, registerMapZoom } = useGtn();
   const { flight, connectionMode } = useFlightData();
   const isLive = connectionMode !== "none";
   const [nexradOn, setNexradOn] = useState(false);
   const [metarOn, setMetarOn] = useState(false);
   const [airwaysOn, setAirwaysOn] = useState(false);
+  const [procOn, setProcOn] = useState(false);
   const [metarData, setMetarData] = useState<Record<string, { category: FlightCategory; raw?: string }>>({});
   const [metarLoading, setMetarLoading] = useState(false);
 
@@ -282,6 +341,7 @@ export const MapDisplay = () => {
     aircraftMarker.current = L.marker([flight.lat, flight.lng], { icon: aircraftIcon, zIndexOffset: 1000 }).addTo(map);
     metarMarkers.current = L.layerGroup();
     airwayLayers.current = L.layerGroup();
+    procLayers.current = L.layerGroup();
     mapInstance.current = map;
 
     // Register zoom controls with GtnContext
@@ -290,7 +350,7 @@ export const MapDisplay = () => {
       () => map.zoomOut(),
     );
 
-    return () => { map.remove(); mapInstance.current = null; aircraftMarker.current = null; nexradLayer.current = null; metarMarkers.current = null; airwayLayers.current = null; };
+    return () => { map.remove(); mapInstance.current = null; aircraftMarker.current = null; nexradLayer.current = null; metarMarkers.current = null; airwayLayers.current = null; procLayers.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -365,6 +425,64 @@ export const MapDisplay = () => {
       }
     }
   }, [airwaysOn]);
+
+  // Toggle Procedures layer
+  useEffect(() => {
+    if (!mapInstance.current || !procLayers.current) return;
+    if (procOn) {
+      procLayers.current.clearLayers();
+
+      for (const proc of PROCEDURES) {
+        const coords = proc.waypoints.map(wp => [wp.lat, wp.lng] as L.LatLngTuple);
+        const isStar = proc.type === "STAR";
+
+        // Solid line for procedures (different from dashed airways)
+        const line = L.polyline(coords, {
+          color: proc.color,
+          weight: 2.5,
+          opacity: 0.8,
+          dashArray: isStar ? "4, 8" : undefined,
+        });
+        procLayers.current.addLayer(line);
+
+        // Arrow markers to show direction
+        const arrowIdx = Math.floor(coords.length / 2);
+        const arrowIcon = L.divIcon({
+          className: "",
+          html: `<span style="font-family:'Share Tech Mono',monospace;font-size:8px;color:${proc.color};background:hsla(220,20%,8%,0.9);padding:1px 5px;border:1px solid ${proc.color};border-radius:2px;white-space:nowrap;">${isStar ? "▼" : "▲"} ${proc.id}</span>`,
+          iconSize: [60, 14],
+          iconAnchor: [30, -6],
+        });
+        procLayers.current.addLayer(L.marker(coords[arrowIdx], { icon: arrowIcon, interactive: false }));
+
+        // Fix markers with altitude labels
+        for (const wp of proc.waypoints) {
+          if (wp.id === "KLAX") continue; // Skip airport marker
+          const fixIcon = L.divIcon({
+            className: "",
+            html: `<svg width="10" height="10" viewBox="0 0 10 10"><polygon points="5,0 10,5 5,10 0,5" fill="${proc.color}" opacity="0.7" stroke="${proc.color}" stroke-width="0.8"/></svg>`,
+            iconSize: [10, 10],
+            iconAnchor: [5, 5],
+          });
+          const fixMarker = L.marker([wp.lat, wp.lng], { icon: fixIcon, zIndexOffset: 650 });
+          const altLabel = wp.alt ? ` ${wp.alt}` : "";
+          fixMarker.bindTooltip(
+            `<div style="font-family:'Share Tech Mono',monospace;font-size:8px;background:hsla(220,20%,8%,0.9);padding:2px 5px;border:1px solid ${proc.color};border-radius:2px;">
+              <span style="color:${proc.color};">${wp.id}</span><span style="color:hsl(0,0%,70%);">${altLabel}</span>
+            </div>`,
+            { direction: "right", offset: [6, 0], className: "leaflet-tooltip-avionics" }
+          );
+          procLayers.current.addLayer(fixMarker);
+        }
+      }
+
+      procLayers.current.addTo(mapInstance.current);
+    } else {
+      if (mapInstance.current.hasLayer(procLayers.current)) {
+        mapInstance.current.removeLayer(procLayers.current);
+      }
+    }
+  }, [procOn]);
 
   // Toggle METAR layer
   useEffect(() => {
@@ -479,11 +597,21 @@ export const MapDisplay = () => {
           >
             AWYS
           </button>
+          <button
+            onClick={() => setProcOn(!procOn)}
+            className={`font-mono text-[9px] px-2 py-1 rounded border transition-colors ${
+              procOn
+                ? "border-avionics-magenta text-avionics-magenta bg-avionics-panel-dark/90"
+                : "border-avionics-divider text-avionics-label bg-avionics-panel-dark/80 hover:text-avionics-white"
+            }`}
+          >
+            PROC
+          </button>
         </div>
 
         {/* Legends */}
-        {(nexradOn || metarOn || airwaysOn) && (
-          <div className="bg-avionics-panel-dark/90 border border-avionics-divider rounded px-2 py-1.5 flex flex-col gap-1">
+        {(nexradOn || metarOn || airwaysOn || procOn) && (
+          <div className="bg-avionics-panel-dark/90 border border-avionics-divider rounded px-2 py-1.5 flex flex-col gap-1 max-h-[200px] overflow-auto">
             {nexradOn && (
               <>
                 <span className="font-mono text-[7px] text-avionics-label">NEXRAD</span>
@@ -515,6 +643,18 @@ export const MapDisplay = () => {
                   <div key={aw.id} className="flex items-center gap-1.5">
                     <div className="w-4 h-0.5 rounded" style={{ backgroundColor: aw.color }} />
                     <span className="font-mono text-[7px] text-avionics-white">{aw.id}</span>
+                  </div>
+                ))}
+              </>
+            )}
+            {(nexradOn || metarOn || airwaysOn) && procOn && <div className="border-t border-avionics-divider/50 my-0.5" />}
+            {procOn && (
+              <>
+                <span className="font-mono text-[7px] text-avionics-label">SID/STAR</span>
+                {PROCEDURES.map((p) => (
+                  <div key={p.id} className="flex items-center gap-1.5">
+                    <div className="w-4 h-0.5 rounded" style={{ backgroundColor: p.color, borderStyle: p.type === "STAR" ? "dashed" : "solid" }} />
+                    <span className="font-mono text-[7px] text-avionics-white">{p.type === "SID" ? "▲" : "▼"} {p.id}</span>
                   </div>
                 ))}
               </>
