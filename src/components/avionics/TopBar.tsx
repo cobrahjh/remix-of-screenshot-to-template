@@ -1,5 +1,4 @@
 import { useGtn } from "./GtnContext";
-import { ComPanel } from "./ComPanel";
 
 interface FrequencyDisplayProps {
   label: string;
@@ -29,7 +28,7 @@ const FrequencyDisplay = ({ label, activeFreq, standbyFreq, standbyLabel, onStan
 );
 
 export const TopBar = () => {
-  const { com, nav, xpdrCode, xpdrMode, toggleComPanel, swapComFreqs } = useGtn();
+  const { com, nav, xpdrCode, xpdrMode, toggleComPanel, toggleAudioPanel, toggleXpdrPanel } = useGtn();
 
   return (
     <div className="flex items-stretch bg-avionics-panel border-b border-avionics-divider relative">
@@ -51,7 +50,7 @@ export const TopBar = () => {
       </div>
 
       {/* Audio Panel */}
-      <button className="flex flex-col items-center justify-center px-3 py-1.5 border-r border-avionics-divider hover:bg-avionics-button-hover transition-colors">
+      <button onClick={toggleAudioPanel} className="flex flex-col items-center justify-center px-3 py-1.5 border-r border-avionics-divider hover:bg-avionics-button-hover transition-colors">
         <span className="text-[10px] text-avionics-white font-medium">Audio</span>
         <span className="text-[10px] text-avionics-white font-medium">Panel</span>
       </button>
@@ -69,12 +68,12 @@ export const TopBar = () => {
       </div>
 
       {/* XPDR */}
-      <div className="flex items-center gap-1 px-2 py-1.5 border-r border-avionics-divider">
+      <button onClick={toggleXpdrPanel} className="flex items-center gap-1 px-2 py-1.5 border-r border-avionics-divider hover:bg-avionics-button-hover transition-colors">
         <div className="flex flex-col items-center">
           <span className="text-[8px] text-avionics-label">XPDR</span>
           <span className="font-mono text-sm text-avionics-green avionics-glow-green font-bold">{xpdrCode}</span>
         </div>
-      </div>
+      </button>
 
       {/* ALT indicator */}
       <div className="flex items-center px-2 py-1.5 border-r border-avionics-divider">
