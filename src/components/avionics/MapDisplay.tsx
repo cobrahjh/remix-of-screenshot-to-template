@@ -208,6 +208,7 @@ export const MapDisplay = () => {
   const metarMarkers = useRef<L.LayerGroup | null>(null);
   const airwayLayers = useRef<L.LayerGroup | null>(null);
   const procLayers = useRef<L.LayerGroup | null>(null);
+  const rangeLayers = useRef<L.LayerGroup | null>(null);
   const { flightPlan, activeWaypointIndex, registerMapZoom } = useGtn();
   const { flight, connectionMode } = useFlightData();
   const isLive = connectionMode !== "none";
@@ -215,6 +216,7 @@ export const MapDisplay = () => {
   const [metarOn, setMetarOn] = useState(false);
   const [airwaysOn, setAirwaysOn] = useState(false);
   const [procOn, setProcOn] = useState(false);
+  const [rangeOn, setRangeOn] = useState(false);
   const [metarData, setMetarData] = useState<Record<string, { category: FlightCategory; raw?: string }>>({});
   const [metarLoading, setMetarLoading] = useState(false);
 
@@ -342,6 +344,7 @@ export const MapDisplay = () => {
     metarMarkers.current = L.layerGroup();
     airwayLayers.current = L.layerGroup();
     procLayers.current = L.layerGroup();
+    rangeLayers.current = L.layerGroup();
     mapInstance.current = map;
 
     // Register zoom controls with GtnContext
@@ -350,7 +353,7 @@ export const MapDisplay = () => {
       () => map.zoomOut(),
     );
 
-    return () => { map.remove(); mapInstance.current = null; aircraftMarker.current = null; nexradLayer.current = null; metarMarkers.current = null; airwayLayers.current = null; procLayers.current = null; };
+    return () => { map.remove(); mapInstance.current = null; aircraftMarker.current = null; nexradLayer.current = null; metarMarkers.current = null; airwayLayers.current = null; procLayers.current = null; rangeLayers.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -484,6 +487,43 @@ export const MapDisplay = () => {
     }
   }, [procOn]);
 
+  // Toggle Range Rings
+  useEffect(() => {
+    if (!mapInstance.current || !rangeLayers.current) return;
+    if (rangeOn) {
+      rangeLayers.current.clearLayers();
+      const NM_TO_METERS = 1852;
+
+      [10, 20, 50].forEach((nm) => {
+        const circle = L.circle([flight.lat, flight.lng], {
+          radius: nm * NM_TO_METERS,
+          color: "hsl(185, 100%, 55%)",
+          weight: 1,
+          opacity: 0.5,
+          fill: false,
+          dashArray: "6, 6",
+          interactive: false,
+        });
+        rangeLayers.current!.addLayer(circle);
+
+        const labelIcon = L.divIcon({
+          className: "",
+          html: `<span style="font-family:'Share Tech Mono',monospace;font-size:8px;color:hsl(185,100%,55%);background:hsla(220,20%,8%,0.85);padding:0 3px;border-radius:2px;">${nm} NM</span>`,
+          iconSize: [36, 12],
+          iconAnchor: [18, 6],
+        });
+        const labelLat = flight.lat + (nm * NM_TO_METERS) / 111320;
+        rangeLayers.current!.addLayer(L.marker([labelLat, flight.lng], { icon: labelIcon, interactive: false }));
+      });
+
+      rangeLayers.current.addTo(mapInstance.current);
+    } else {
+      if (mapInstance.current.hasLayer(rangeLayers.current)) {
+        mapInstance.current.removeLayer(rangeLayers.current);
+      }
+    }
+  }, [rangeOn, flight.lat, flight.lng]);
+
   // Toggle METAR layer
   useEffect(() => {
     if (!mapInstance.current || !metarMarkers.current) return;
@@ -606,6 +646,16 @@ export const MapDisplay = () => {
             }`}
           >
             PROC
+          </button>
+          <button
+            onClick={() => setRangeOn(!rangeOn)}
+            className={`font-mono text-[9px] px-2 py-1 rounded border transition-colors ${
+              rangeOn
+                ? "border-avionics-cyan text-avionics-cyan bg-avionics-panel-dark/90"
+                : "border-avionics-divider text-avionics-label bg-avionics-panel-dark/80 hover:text-avionics-white"
+            }`}
+          >
+            RNG
           </button>
         </div>
 
