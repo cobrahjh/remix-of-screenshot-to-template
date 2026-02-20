@@ -5,15 +5,19 @@ import { MapDisplay } from "@/components/avionics/MapDisplay";
 import { FlightPlanStrip } from "@/components/avionics/FlightPlanStrip";
 import { BottomToolbar } from "@/components/avionics/BottomToolbar";
 import { ComPanel } from "@/components/avionics/ComPanel";
+import { AudioPanel } from "@/components/avionics/AudioPanel";
+import { XpdrPanel } from "@/components/avionics/XpdrPanel";
 import { HomeScreen } from "@/components/avionics/screens/HomeScreen";
 import { TrafficScreen } from "@/components/avionics/screens/TrafficScreen";
 import { TerrainScreen } from "@/components/avionics/screens/TerrainScreen";
 import { WeatherScreen } from "@/components/avionics/screens/WeatherScreen";
+import { SystemScreen } from "@/components/avionics/screens/SystemScreen";
+import { UtilitiesScreen } from "@/components/avionics/screens/UtilitiesScreen";
 import { PlaceholderScreen } from "@/components/avionics/screens/PlaceholderScreen";
 import { Home } from "lucide-react";
 
 const GtnDisplay = () => {
-  const { currentPage, comPanelOpen, navigateTo } = useGtn();
+  const { currentPage, comPanelOpen, audioPanelOpen, xpdrPanelOpen, navigateTo } = useGtn();
 
   const renderScreen = () => {
     switch (currentPage) {
@@ -33,6 +37,10 @@ const GtnDisplay = () => {
         return <TerrainScreen />;
       case "weather":
         return <WeatherScreen />;
+      case "system":
+        return <SystemScreen />;
+      case "utilities":
+        return <UtilitiesScreen />;
       default:
         return <PlaceholderScreen page={currentPage} />;
     }
@@ -61,6 +69,8 @@ const GtnDisplay = () => {
       <div className="flex-1 flex flex-col relative overflow-hidden">
         {renderScreen()}
         {comPanelOpen && <ComPanel />}
+        {audioPanelOpen && <AudioPanel />}
+        {xpdrPanelOpen && <XpdrPanel />}
       </div>
 
       {/* Bottom toolbar */}
