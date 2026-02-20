@@ -38,6 +38,32 @@ const METAR_STATIONS: { icao: string; lat: number; lng: number }[] = [
   { icao: "KSBP", lat: 35.2368, lng: -120.6424 },
 ];
 
+// Victor Airways with VOR waypoints
+const VICTOR_AIRWAYS: { id: string; color: string; waypoints: { id: string; lat: number; lng: number; type: "VOR" | "FIX" }[] }[] = [
+  {
+    id: "V25",
+    color: "hsl(185, 100%, 50%)",
+    waypoints: [
+      { id: "SFO", lat: 37.6197, lng: -122.3750, type: "VOR" },
+      { id: "SJC", lat: 37.3720, lng: -121.9270, type: "VOR" },
+      { id: "SNS", lat: 36.6628, lng: -121.6064, type: "VOR" },
+      { id: "PRB", lat: 35.6729, lng: -120.6271, type: "VOR" },
+      { id: "SBP", lat: 35.2368, lng: -120.6424, type: "VOR" },
+    ],
+  },
+  {
+    id: "V113",
+    color: "hsl(40, 100%, 55%)",
+    waypoints: [
+      { id: "OAK", lat: 37.7253, lng: -122.2208, type: "VOR" },
+      { id: "LVK", lat: 37.6934, lng: -121.8204, type: "VOR" },
+      { id: "MOD", lat: 37.6258, lng: -120.9544, type: "VOR" },
+      { id: "MRY", lat: 36.5670, lng: -121.7930, type: "VOR" },
+      { id: "AVE", lat: 34.9544, lng: -118.3465, type: "VOR" },
+    ],
+  },
+];
+
 type FlightCategory = "VFR" | "MVFR" | "IFR" | "LIFR" | "UNKN";
 
 const CATEGORY_COLORS: Record<FlightCategory, string> = {
@@ -89,11 +115,13 @@ export const MapDisplay = () => {
   const aircraftMarker = useRef<L.Marker | null>(null);
   const nexradLayer = useRef<L.TileLayer | null>(null);
   const metarMarkers = useRef<L.LayerGroup | null>(null);
+  const airwayLayers = useRef<L.LayerGroup | null>(null);
   const { flightPlan, activeWaypointIndex } = useGtn();
   const { flight, connectionMode } = useFlightData();
   const isLive = connectionMode !== "none";
   const [nexradOn, setNexradOn] = useState(false);
   const [metarOn, setMetarOn] = useState(false);
+  const [airwaysOn, setAirwaysOn] = useState(false);
   const [metarData, setMetarData] = useState<Record<string, { category: FlightCategory; raw?: string }>>({});
   const [metarLoading, setMetarLoading] = useState(false);
 
@@ -219,9 +247,10 @@ export const MapDisplay = () => {
 
     aircraftMarker.current = L.marker([flight.lat, flight.lng], { icon: aircraftIcon, zIndexOffset: 1000 }).addTo(map);
     metarMarkers.current = L.layerGroup();
+    airwayLayers.current = L.layerGroup();
     mapInstance.current = map;
 
-    return () => { map.remove(); mapInstance.current = null; aircraftMarker.current = null; nexradLayer.current = null; metarMarkers.current = null; };
+    return () => { map.remove(); mapInstance.current = null; aircraftMarker.current = null; nexradLayer.current = null; metarMarkers.current = null; airwayLayers.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -243,6 +272,59 @@ export const MapDisplay = () => {
       }
     }
   }, [nexradOn]);
+
+  // Toggle Airways layer
+  useEffect(() => {
+    if (!mapInstance.current || !airwayLayers.current) return;
+    if (airwaysOn) {
+      airwayLayers.current.clearLayers();
+
+      for (const airway of VICTOR_AIRWAYS) {
+        // Draw polyline for the airway
+        const coords = airway.waypoints.map(wp => [wp.lat, wp.lng] as L.LatLngTuple);
+        const line = L.polyline(coords, {
+          color: airway.color,
+          weight: 1.5,
+          opacity: 0.7,
+          dashArray: "6, 4",
+        });
+        airwayLayers.current.addLayer(line);
+
+        // Airway label at midpoint
+        const midIdx = Math.floor(airway.waypoints.length / 2);
+        const midWp = airway.waypoints[midIdx];
+        const labelIcon = L.divIcon({
+          className: "",
+          html: `<span style="font-family:'Share Tech Mono',monospace;font-size:9px;color:${airway.color};background:hsla(220,20%,8%,0.85);padding:1px 4px;border:1px solid ${airway.color};border-radius:2px;">${airway.id}</span>`,
+          iconSize: [40, 14],
+          iconAnchor: [20, -4],
+        });
+        airwayLayers.current.addLayer(L.marker([midWp.lat, midWp.lng], { icon: labelIcon, interactive: false }));
+
+        // VOR markers along the airway
+        for (const wp of airway.waypoints) {
+          const vorIcon = L.divIcon({
+            className: "",
+            html: `<svg width="12" height="12" viewBox="0 0 12 12"><polygon points="6,0 12,6 6,12 0,6" fill="none" stroke="${airway.color}" stroke-width="1.2"/><circle cx="6" cy="6" r="2" fill="${airway.color}" opacity="0.6"/></svg>`,
+            iconSize: [12, 12],
+            iconAnchor: [6, 6],
+          });
+          const vorMarker = L.marker([wp.lat, wp.lng], { icon: vorIcon, zIndexOffset: 600 });
+          vorMarker.bindTooltip(
+            `<span style="font-family:'Share Tech Mono',monospace;font-size:9px;color:${airway.color};background:hsla(220,20%,8%,0.85);padding:1px 4px;border:1px solid ${airway.color};border-radius:2px;">${wp.id} ${wp.type}</span>`,
+            { direction: "right", offset: [8, 0], className: "leaflet-tooltip-avionics" }
+          );
+          airwayLayers.current.addLayer(vorMarker);
+        }
+      }
+
+      airwayLayers.current.addTo(mapInstance.current);
+    } else {
+      if (mapInstance.current.hasLayer(airwayLayers.current)) {
+        mapInstance.current.removeLayer(airwayLayers.current);
+      }
+    }
+  }, [airwaysOn]);
 
   // Toggle METAR layer
   useEffect(() => {
@@ -347,10 +429,20 @@ export const MapDisplay = () => {
           >
             {metarLoading ? "METAR..." : "METAR"}
           </button>
+          <button
+            onClick={() => setAirwaysOn(!airwaysOn)}
+            className={`font-mono text-[9px] px-2 py-1 rounded border transition-colors ${
+              airwaysOn
+                ? "border-avionics-amber text-avionics-amber bg-avionics-panel-dark/90"
+                : "border-avionics-divider text-avionics-label bg-avionics-panel-dark/80 hover:text-avionics-white"
+            }`}
+          >
+            AWYS
+          </button>
         </div>
 
         {/* Legends */}
-        {(nexradOn || metarOn) && (
+        {(nexradOn || metarOn || airwaysOn) && (
           <div className="bg-avionics-panel-dark/90 border border-avionics-divider rounded px-2 py-1.5 flex flex-col gap-1">
             {nexradOn && (
               <>
@@ -371,6 +463,18 @@ export const MapDisplay = () => {
                   <div key={cat} className="flex items-center gap-1.5">
                     <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[cat] }} />
                     <span className="font-mono text-[7px] text-avionics-white">{cat}</span>
+                  </div>
+                ))}
+              </>
+            )}
+            {(nexradOn || metarOn) && airwaysOn && <div className="border-t border-avionics-divider/50 my-0.5" />}
+            {airwaysOn && (
+              <>
+                <span className="font-mono text-[7px] text-avionics-label">AIRWAYS</span>
+                {VICTOR_AIRWAYS.map((aw) => (
+                  <div key={aw.id} className="flex items-center gap-1.5">
+                    <div className="w-4 h-0.5 rounded" style={{ backgroundColor: aw.color }} />
+                    <span className="font-mono text-[7px] text-avionics-white">{aw.id}</span>
                   </div>
                 ))}
               </>
