@@ -467,7 +467,7 @@ const AIRPORTS: Record<string, AirportData> = {
   },
 };
 
-const RunwaySvg = ({ runway }: { runway: RunwayData }) => {
+const RunwaySvg = ({ runway, index }: { runway: RunwayData; index: number }) => {
   const rad = (runway.angle - 90) * (Math.PI / 180);
   const halfLen = runway.length / 2;
   const x1 = runway.cx - halfLen * Math.cos(rad);
@@ -482,9 +482,37 @@ const RunwaySvg = ({ runway }: { runway: RunwayData }) => {
   const tx2 = x2 - threshOffset * Math.cos(rad);
   const ty2 = y2 - threshOffset * Math.sin(rad);
 
-  // Perpendicular for threshold marks
+  // Perpendicular for threshold marks & hold short lines
   const perpX = Math.sin(rad) * (runway.width / 2 - 1);
   const perpY = -Math.cos(rad) * (runway.width / 2 - 1);
+
+  // Extended perpendicular for hold short markings (wider than runway)
+  const hsExtend = runway.width * 0.9;
+  const hsPerpX = Math.sin(rad) * hsExtend;
+  const hsPerpY = -Math.cos(rad) * hsExtend;
+
+  // Hold short positions: ~25% from each end, offset perpendicular from runway edge
+  const hsOffset1 = halfLen * 0.72;
+  const hs1x = runway.cx - hsOffset1 * Math.cos(rad);
+  const hs1y = runway.cy - hsOffset1 * Math.sin(rad);
+  const hs2x = runway.cx + hsOffset1 * Math.cos(rad);
+  const hs2y = runway.cy + hsOffset1 * Math.sin(rad);
+
+  // ILS critical area: hatched zone near each threshold (~18% of runway from end)
+  const ilsLen = halfLen * 0.22;
+  const ils1StartX = x1;
+  const ils1StartY = y1;
+  const ils1EndX = x1 + ilsLen * Math.cos(rad);
+  const ils1EndY = y1 + ilsLen * Math.sin(rad);
+  const ils2StartX = x2;
+  const ils2StartY = y2;
+  const ils2EndX = x2 - ilsLen * Math.cos(rad);
+  const ils2EndY = y2 - ilsLen * Math.sin(rad);
+
+  // ILS critical area box corners (wider than runway for visibility)
+  const ilsW = runway.width * 0.7;
+  const ilsPerpX = Math.sin(rad) * ilsW;
+  const ilsPerpY = -Math.cos(rad) * ilsW;
 
   // Label positions (offset beyond runway ends)
   const labelOffset = 18;
@@ -493,8 +521,17 @@ const RunwaySvg = ({ runway }: { runway: RunwayData }) => {
   const lx2 = x2 + labelOffset * Math.cos(rad);
   const ly2 = y2 + labelOffset * Math.sin(rad);
 
+  const patternId = `ils-hatch-${index}`;
+
   return (
     <g>
+      {/* ILS hatch pattern definition */}
+      <defs>
+        <pattern id={patternId} patternUnits="userSpaceOnUse" width="4" height="4" patternTransform={`rotate(${runway.angle + 45})`}>
+          <line x1="0" y1="0" x2="0" y2="4" stroke="hsl(0 85% 55%)" strokeWidth="1" opacity="0.5" />
+        </pattern>
+      </defs>
+
       {/* Runway surface */}
       <line
         x1={x1} y1={y1} x2={x2} y2={y2}
@@ -514,6 +551,62 @@ const RunwaySvg = ({ runway }: { runway: RunwayData }) => {
       {/* Threshold marks */}
       <line x1={tx1 - perpX} y1={ty1 - perpY} x2={tx1 + perpX} y2={ty1 + perpY} stroke="hsl(0 0% 92%)" strokeWidth={1.5} opacity={0.8} />
       <line x1={tx2 - perpX} y1={ty2 - perpY} x2={tx2 + perpX} y2={ty2 + perpY} stroke="hsl(0 0% 92%)" strokeWidth={1.5} opacity={0.8} />
+
+      {/* Hold Short Markings — double yellow lines perpendicular to runway */}
+      {/* Hold short 1 (near heading[0] end) */}
+      <line x1={hs1x - hsPerpX} y1={hs1y - hsPerpY} x2={hs1x + hsPerpX} y2={hs1y + hsPerpY}
+        stroke="hsl(50 100% 50%)" strokeWidth={1.8} opacity={0.85} />
+      <line
+        x1={hs1x - hsPerpX + 3 * Math.cos(rad)} y1={hs1y - hsPerpY + 3 * Math.sin(rad)}
+        x2={hs1x + hsPerpX + 3 * Math.cos(rad)} y2={hs1y + hsPerpY + 3 * Math.sin(rad)}
+        stroke="hsl(50 100% 50%)" strokeWidth={1} strokeDasharray="3 2" opacity={0.7} />
+      {/* HS label */}
+      <text
+        x={hs1x - hsPerpX - 6 * Math.sin(rad)} y={hs1y - hsPerpY + 6 * Math.cos(rad)}
+        fill="hsl(50 100% 50%)" fontSize="5" fontFamily="Share Tech Mono" textAnchor="middle" opacity={0.8}
+      >HS</text>
+
+      {/* Hold short 2 (near heading[1] end) */}
+      <line x1={hs2x - hsPerpX} y1={hs2y - hsPerpY} x2={hs2x + hsPerpX} y2={hs2y + hsPerpY}
+        stroke="hsl(50 100% 50%)" strokeWidth={1.8} opacity={0.85} />
+      <line
+        x1={hs2x - hsPerpX - 3 * Math.cos(rad)} y1={hs2y - hsPerpY - 3 * Math.sin(rad)}
+        x2={hs2x + hsPerpX - 3 * Math.cos(rad)} y2={hs2y + hsPerpY - 3 * Math.sin(rad)}
+        stroke="hsl(50 100% 50%)" strokeWidth={1} strokeDasharray="3 2" opacity={0.7} />
+      <text
+        x={hs2x + hsPerpX + 6 * Math.sin(rad)} y={hs2y + hsPerpY - 6 * Math.cos(rad)}
+        fill="hsl(50 100% 50%)" fontSize="5" fontFamily="Share Tech Mono" textAnchor="middle" opacity={0.8}
+      >HS</text>
+
+      {/* ILS Critical Area — hatched polygon near each threshold */}
+      {/* ILS area 1 (heading[0] approach end) */}
+      <polygon
+        points={`${ils1StartX - ilsPerpX},${ils1StartY - ilsPerpY} ${ils1StartX + ilsPerpX},${ils1StartY + ilsPerpY} ${ils1EndX + ilsPerpX},${ils1EndY + ilsPerpY} ${ils1EndX - ilsPerpX},${ils1EndY - ilsPerpY}`}
+        fill={`url(#${patternId})`}
+        stroke="hsl(0 85% 55%)"
+        strokeWidth={0.6}
+        opacity={0.6}
+      />
+      <text
+        x={(ils1StartX + ils1EndX) / 2 - ilsPerpX * 1.6}
+        y={(ils1StartY + ils1EndY) / 2 - ilsPerpY * 1.6}
+        fill="hsl(0 85% 55%)" fontSize="4.5" fontFamily="Share Tech Mono" textAnchor="middle" dominantBaseline="central" opacity={0.8}
+      >ILS</text>
+
+      {/* ILS area 2 (heading[1] approach end) */}
+      <polygon
+        points={`${ils2StartX - ilsPerpX},${ils2StartY - ilsPerpY} ${ils2StartX + ilsPerpX},${ils2StartY + ilsPerpY} ${ils2EndX + ilsPerpX},${ils2EndY + ilsPerpY} ${ils2EndX - ilsPerpX},${ils2EndY - ilsPerpY}`}
+        fill={`url(#${patternId})`}
+        stroke="hsl(0 85% 55%)"
+        strokeWidth={0.6}
+        opacity={0.6}
+      />
+      <text
+        x={(ils2StartX + ils2EndX) / 2 + ilsPerpX * 1.6}
+        y={(ils2StartY + ils2EndY) / 2 + ilsPerpY * 1.6}
+        fill="hsl(0 85% 55%)" fontSize="4.5" fontFamily="Share Tech Mono" textAnchor="middle" dominantBaseline="central" opacity={0.8}
+      >ILS</text>
+
       {/* Runway number labels */}
       <text x={lx1} y={ly1} fill="hsl(0 0% 92%)" fontSize="9" fontFamily="Share Tech Mono" textAnchor="middle" dominantBaseline="central">
         {runway.headings[0]}
@@ -642,8 +735,8 @@ export const SafeTaxiScreen = () => {
           ))}
 
           {/* Runways */}
-          {airport.runways.map((rw) => (
-            <RunwaySvg key={rw.id} runway={rw} />
+          {airport.runways.map((rw, i) => (
+            <RunwaySvg key={rw.id} runway={rw} index={i} />
           ))}
 
           {/* Buildings */}
