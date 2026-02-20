@@ -1,5 +1,5 @@
 import { useGtn, GtnPage } from "../GtnContext";
-import { Map, Radio, Mountain, CloudRain, FileText, Route, ListChecks, Navigation, MapPin, Wrench, Settings, AlertTriangle } from "lucide-react";
+import { Map, Radio, Mountain, CloudRain, FileText, Route, ListChecks, Navigation, MapPin, Wrench, Settings, AlertTriangle, Fuel } from "lucide-react";
 
 interface AppIconProps {
   icon: React.ReactNode;
@@ -120,6 +120,12 @@ export const HomeScreen = () => {
           label="System"
           page="system"
           color="bg-avionics-button"
+        />
+        <AppIcon
+          icon={<Fuel className="w-5 h-5 text-avionics-amber" />}
+          label="Fuel"
+          page="fuel"
+          color="bg-[hsl(35_40%_20%)]"
         />
         <AppIcon
           icon={<AlertTriangle className="w-5 h-5 text-avionics-amber" />}
