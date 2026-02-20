@@ -86,13 +86,11 @@ export const TopBar = () => {
       <div className="flex items-center px-2 py-1.5">
         <div className="flex flex-col mr-1">
           <span className="text-[9px] text-avionics-label">NAV</span>
+          <span className="text-[8px] text-avionics-label">STBY</span>
         </div>
         <div className="flex flex-col gap-0.5">
           <span className="font-mono text-sm text-avionics-green avionics-glow-green font-bold leading-none">{nav.activeFreq}</span>
-          <div className="flex items-center gap-1">
-            <span className="text-[8px] text-avionics-label">STBY</span>
-            <span className="font-mono text-xs text-avionics-cyan leading-none">{nav.standbyFreq}</span>
-          </div>
+          <span className="font-mono text-xs text-avionics-cyan leading-none">{nav.standbyFreq}</span>
         </div>
       </div>
     </div>
