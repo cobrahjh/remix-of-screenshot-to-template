@@ -23,6 +23,7 @@ import { NearestScreen } from "@/components/avionics/screens/NearestScreen";
 import { ChartsScreen } from "@/components/avionics/screens/ChartsScreen";
 import { WaypointScreen } from "@/components/avionics/screens/WaypointScreen";
 import { ServicesScreen } from "@/components/avionics/screens/ServicesScreen";
+import { FuelScreen } from "@/components/avionics/screens/FuelScreen";
 import { PlaceholderScreen } from "@/components/avionics/screens/PlaceholderScreen";
 import { CdiBar } from "@/components/avionics/CdiBar";
 import { Home, Navigation } from "lucide-react";
@@ -68,6 +69,8 @@ const GtnDisplay = () => {
         return <WaypointScreen />;
       case "services":
         return <ServicesScreen />;
+      case "fuel":
+        return <FuelScreen />;
       default:
         return <PlaceholderScreen page={currentPage} />;
     }
@@ -113,6 +116,7 @@ const GtnDisplay = () => {
           { label: "CHRT", page: "charts" as const },
           { label: "PROC", page: "proc" as const },
           { label: "NRST", page: "nearest" as const },
+          { label: "FUEL", page: "fuel" as const },
           { label: "SVC", page: "services" as const },
         ]).map((tab) => (
           <button
