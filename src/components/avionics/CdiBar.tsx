@@ -7,20 +7,27 @@ export const CdiBar = () => {
   // Animated CDI deviation using smooth sine-based drift
   const [lateralDev, setLateralDev] = useState(0.15);
   const [verticalDev, setVerticalDev] = useState(-0.1);
+  const [gs, setGs] = useState(125);
+  const [trk, setTrk] = useState(298);
+  const [brg, setBrg] = useState(315);
   const timeRef = useRef(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
       timeRef.current += 0.05;
       const t = timeRef.current;
-      // Lateral: slow drift with slight oscillation, simulating course corrections
       setLateralDev(
         Math.sin(t * 0.7) * 0.35 + Math.sin(t * 1.9) * 0.15 + Math.sin(t * 0.3) * 0.1
       );
-      // Vertical: gentler movement, tracking glideslope
       setVerticalDev(
         Math.sin(t * 0.5 + 1) * 0.25 + Math.sin(t * 1.3) * 0.1
       );
+      // GS: cruise ~125kt with slight variation
+      setGs(Math.round(125 + Math.sin(t * 0.4) * 3 + Math.sin(t * 1.1) * 1.5));
+      // TRK: drifting around DTK
+      setTrk(Math.round(298 + Math.sin(t * 0.6) * 4 + Math.sin(t * 1.5) * 1.5));
+      // BRG: slowly changing bearing to next waypoint
+      setBrg(Math.round(315 + Math.sin(t * 0.3) * 3 + Math.sin(t * 0.8) * 1));
     }, 60);
     return () => clearInterval(interval);
   }, []);
@@ -84,6 +91,27 @@ export const CdiBar = () => {
           />
         </div>
         <span className="font-mono text-[9px] text-avionics-cyan w-8 text-right">{courseTo}</span>
+      </div>
+
+      {/* GS / TRK / BRG strip */}
+      <div className="flex items-center justify-between mt-0.5 pt-1 border-t border-avionics-divider/50">
+        <div className="flex items-center gap-1">
+          <span className="text-[8px] text-avionics-label">GS</span>
+          <span className="font-mono text-[10px] text-avionics-green">{gs}</span>
+          <span className="text-[7px] text-avionics-label">KT</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-[8px] text-avionics-label">TRK</span>
+          <span className="font-mono text-[10px] text-avionics-magenta">{trk}°</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-[8px] text-avionics-label">BRG</span>
+          <span className="font-mono text-[10px] text-avionics-cyan">{brg}°</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-[8px] text-avionics-label">DTK</span>
+          <span className="font-mono text-[10px] text-avionics-magenta">{dtk}°</span>
+        </div>
       </div>
     </div>
   );
