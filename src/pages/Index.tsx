@@ -1,4 +1,5 @@
 import { GtnProvider, useGtn } from "@/components/avionics/GtnContext";
+import { FlightDataProvider } from "@/components/avionics/FlightDataContext";
 import { TopBar } from "@/components/avionics/TopBar";
 import { NavInfoStrip } from "@/components/avionics/NavInfoStrip";
 import { MapDisplay } from "@/components/avionics/MapDisplay";
@@ -149,9 +150,11 @@ const GtnDisplay = () => {
 const Index = () => {
   return (
     <GtnProvider>
-      <div className="flex items-center justify-center min-h-screen bg-background p-4">
-        <GtnDisplay />
-      </div>
+      <FlightDataProvider>
+        <div className="flex items-center justify-center min-h-screen bg-background p-4">
+          <GtnDisplay />
+        </div>
+      </FlightDataProvider>
     </GtnProvider>
   );
 };
