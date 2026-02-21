@@ -48,7 +48,7 @@ export const HomeScreen = () => {
       </div>
 
       {/* App icon grid */}
-      <div className="flex-1 grid grid-cols-4 gap-1 p-3 content-start">
+      <div className="flex-1 grid grid-cols-4 gap-1 p-3 content-start overflow-y-auto">
         <AppIcon
           icon={<Gauge className="w-5 h-5 text-avionics-green" />}
           label="PFD"
