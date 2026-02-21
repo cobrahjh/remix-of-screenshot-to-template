@@ -302,7 +302,7 @@ export const MapDisplay = () => {
       minZoom: 3,
       zoomControl: false,
       attributionControl: false,
-      maxBoundsViscosity: 1.0,
+      worldCopyJump: true,
     });
 
     L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
