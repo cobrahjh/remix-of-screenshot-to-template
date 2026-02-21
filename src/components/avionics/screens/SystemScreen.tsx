@@ -332,6 +332,30 @@ const BUILTIN_SCHEMES: ColorScheme[] = [
     id: "arctic", name: "Arctic", builtin: true,
     vars: { "--avionics-green": "210 60% 70%", "--avionics-cyan": "190 50% 65%", "--avionics-magenta": "240 50% 70%", "--avionics-amber": "45 70% 65%" },
   },
+  {
+    id: "amber-classic", name: "Amber Classic", builtin: true,
+    vars: { "--avionics-green": "38 100% 50%", "--avionics-cyan": "45 90% 55%", "--avionics-magenta": "30 80% 45%", "--avionics-amber": "25 100% 50%" },
+  },
+  {
+    id: "red-alert", name: "Red Alert", builtin: true,
+    vars: { "--avionics-green": "0 85% 55%", "--avionics-cyan": "350 90% 60%", "--avionics-magenta": "330 80% 55%", "--avionics-amber": "15 100% 50%" },
+  },
+  {
+    id: "phosphor", name: "Phosphor", builtin: true,
+    vars: { "--avionics-green": "120 100% 45%", "--avionics-cyan": "115 80% 50%", "--avionics-magenta": "130 60% 55%", "--avionics-amber": "90 80% 50%" },
+  },
+  {
+    id: "stealth", name: "Stealth", builtin: true,
+    vars: { "--avionics-green": "220 15% 55%", "--avionics-cyan": "210 20% 50%", "--avionics-magenta": "230 15% 45%", "--avionics-amber": "35 30% 50%" },
+  },
+  {
+    id: "royal", name: "Royal", builtin: true,
+    vars: { "--avionics-green": "270 70% 60%", "--avionics-cyan": "245 80% 65%", "--avionics-magenta": "310 70% 55%", "--avionics-amber": "40 90% 55%" },
+  },
+  {
+    id: "infrared", name: "Infrared", builtin: true,
+    vars: { "--avionics-green": "0 70% 45%", "--avionics-cyan": "20 80% 50%", "--avionics-magenta": "340 70% 50%", "--avionics-amber": "35 90% 50%" },
+  },
 ];
 
 function parseHsl(hslStr: string): [number, number, number] {
