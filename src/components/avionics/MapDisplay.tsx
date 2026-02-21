@@ -690,8 +690,8 @@ export const MapDisplay = () => {
   }, [flight.lat, flight.lng, flight.heading, isLive]);
 
   return (
-    <div className="flex-1 relative overflow-hidden">
-      <div ref={mapRef} className="absolute inset-0" />
+    <div className="flex-1 relative overflow-hidden bg-avionics-panel-dark">
+      <div ref={mapRef} className="absolute inset-0" style={{ background: "hsl(220, 20%, 8%)" }} />
 
       {/* Connection status overlay */}
       <div className="absolute top-2 left-2 z-[1000] flex items-center gap-1.5" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
