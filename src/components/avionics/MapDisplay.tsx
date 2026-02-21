@@ -303,6 +303,10 @@ export const MapDisplay = () => {
       zoomControl: false,
       attributionControl: false,
       worldCopyJump: true,
+      zoomAnimation: true,
+      zoomAnimationThreshold: 4,
+      fadeAnimation: true,
+      markerZoomAnimation: true,
     });
 
     L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
@@ -365,8 +369,8 @@ export const MapDisplay = () => {
 
     // Register zoom controls with GtnContext
     registerMapZoom(
-      () => map.zoomIn(),
-      () => map.zoomOut(),
+      () => map.zoomIn(1, { animate: true }),
+      () => map.zoomOut(1, { animate: true }),
     );
 
     return () => { map.remove(); mapInstance.current = null; aircraftMarker.current = null; nexradLayer.current = null; metarMarkers.current = null; airwayLayers.current = null; procLayers.current = null; rangeLayers.current = null; terrainLayer.current = null; };
