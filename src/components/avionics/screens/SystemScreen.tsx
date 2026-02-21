@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useFlightData, ConnectionMode } from "../FlightDataContext";
-import { Wifi, WifiOff, TestTube2, Check, Save, Trash2, PenLine, Plus, Sun, Moon } from "lucide-react";
+import { Wifi, WifiOff, TestTube2, Check, Save, Trash2, PenLine, Plus, Sun, Moon, Download, Upload } from "lucide-react";
 
 type Tab = "conn" | "setup" | "gps" | "units" | "database" | "backlight";
 
@@ -446,6 +446,7 @@ const DisplayTab = () => {
     const saved = localStorage.getItem("avionics-display-mode");
     return saved !== "light";
   });
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState(false);
   const [editVars, setEditVars] = useState<Record<string, string>>({});
   const [editName, setEditName] = useState("");
@@ -525,7 +526,43 @@ const DisplayTab = () => {
     if (scheme) applyVars(scheme.vars);
   };
 
-  // ── Editor view ──
+  const exportSchemes = () => {
+    const data = { schemes: userSchemes, exportedAt: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "avionics-color-schemes.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importSchemes = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const parsed = JSON.parse(ev.target?.result as string);
+        const incoming: ColorScheme[] = Array.isArray(parsed.schemes) ? parsed.schemes : Array.isArray(parsed) ? parsed : [];
+        if (incoming.length === 0) return;
+        // Merge: skip duplicates by name
+        const existingNames = new Set(userSchemes.map((s) => s.name));
+        const newSchemes = incoming
+          .filter((s: any) => s.name && s.vars && !existingNames.has(s.name))
+          .map((s: any) => ({ id: "user_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6), name: s.name, vars: s.vars }));
+        const updated = [...userSchemes, ...newSchemes];
+        setUserSchemes(updated);
+        saveUserSchemes(updated);
+      } catch {
+        console.warn("Failed to parse color scheme JSON");
+      }
+    };
+    reader.readAsText(file);
+    // Reset input so same file can be re-imported
+    e.target.value = "";
+  };
+
   if (editing) {
     return (
       <div>
@@ -689,6 +726,27 @@ const DisplayTab = () => {
             </div>
           );
         })}
+      </div>
+
+      {/* Export / Import */}
+      <div className="flex items-center justify-between px-3 py-2 border-t border-avionics-divider">
+        <span className="font-mono text-[9px] text-avionics-amber">SHARE SCHEMES</span>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={exportSchemes}
+            disabled={userSchemes.length === 0}
+            className="flex items-center gap-1 px-2 py-1 text-[8px] font-mono text-avionics-cyan border border-avionics-cyan/30 rounded hover:bg-avionics-cyan/10 disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <Download className="w-2.5 h-2.5" /> EXPORT
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-1 px-2 py-1 text-[8px] font-mono text-avionics-green border border-avionics-green/30 rounded hover:bg-avionics-green/10"
+          >
+            <Upload className="w-2.5 h-2.5" /> IMPORT
+          </button>
+          <input ref={fileInputRef} type="file" accept=".json" onChange={importSchemes} className="hidden" />
+        </div>
       </div>
     </div>
   );
