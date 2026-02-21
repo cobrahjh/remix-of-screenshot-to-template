@@ -74,6 +74,7 @@ interface GtnContextValue extends GtnState {
   toggleSmartGlide: () => void;
   toggleEmergencyDescent: () => void;
   setActiveWaypoint: (index: number) => void;
+  setFlightPlan: (plan: FlightPlanWaypoint[]) => void;
   toggleObs: () => void;
   setObsCourse: (course: number) => void;
   mapZoomIn: () => void;
@@ -209,6 +210,14 @@ export const GtnProvider = ({ children }: { children: React.ReactNode }) => {
     }));
   }, []);
 
+  const setFlightPlan = useCallback((plan: FlightPlanWaypoint[]) => {
+    setState(s => ({
+      ...s,
+      flightPlan: plan,
+      activeWaypointIndex: 0,
+    }));
+  }, []);
+
   const toggleObs = useCallback(() => {
     setState(s => ({ ...s, obsMode: !s.obsMode }));
   }, []);
@@ -232,7 +241,7 @@ export const GtnProvider = ({ children }: { children: React.ReactNode }) => {
       toggleComPanel, toggleAudioPanel, toggleXpdrPanel,
       setXpdrMode, setXpdrCode, toggleAudioSetting,
       activateDirectTo, cancelDirectTo, toggleSmartGlide, toggleEmergencyDescent,
-      setActiveWaypoint, toggleObs, setObsCourse,
+      setActiveWaypoint, setFlightPlan, toggleObs, setObsCourse,
       mapZoomIn, mapZoomOut, registerMapZoom,
     }}>
       {children}

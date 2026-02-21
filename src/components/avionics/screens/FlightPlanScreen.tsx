@@ -1,5 +1,305 @@
 import { useGtn, FlightPlanWaypoint } from "../GtnContext";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
+import { Upload, FileText, X, AlertTriangle } from "lucide-react";
+
+/* ─── Flight Plan Parsers ─── */
+
+/** Parse Garmin .fpl XML files */
+function parseGarminFpl(xml: string): FlightPlanWaypoint[] | null {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xml, "text/xml");
+    const wpTable = doc.querySelectorAll("waypoint-table waypoint");
+    if (!wpTable.length) return null;
+
+    // Build lookup from waypoint-table
+    const lookup: Record<string, { lat: number; lng: number; type: string }> = {};
+    wpTable.forEach(wp => {
+      const id = wp.querySelector("identifier")?.textContent?.trim() || "";
+      const lat = parseFloat(wp.querySelector("lat")?.textContent || "0");
+      const lng = parseFloat(wp.querySelector("lon")?.textContent || "0");
+      const rawType = wp.querySelector("type")?.textContent?.trim()?.toUpperCase() || "";
+      let type = "fix";
+      if (rawType.includes("AIRPORT")) type = "airport";
+      else if (rawType.includes("VOR")) type = "vor";
+      else if (rawType.includes("NDB")) type = "ndb";
+      else if (rawType.includes("USER")) type = "user";
+      lookup[id] = { lat, lng, type };
+    });
+
+    // Read route points
+    const routePoints = doc.querySelectorAll("route route-point");
+    if (!routePoints.length) return null;
+
+    const waypoints: FlightPlanWaypoint[] = [];
+    routePoints.forEach((rp, i) => {
+      const id = rp.querySelector("waypoint-identifier")?.textContent?.trim() || `WP${i}`;
+      const info = lookup[id] || { lat: 0, lng: 0, type: "fix" };
+      waypoints.push({
+        id: String(i + 1),
+        name: id,
+        type: info.type as FlightPlanWaypoint["type"],
+        dtk: 0,
+        dis: 0,
+        ete: "00:00",
+        lat: info.lat,
+        lng: info.lng,
+      });
+    });
+
+    return computeLegs(waypoints);
+  } catch {
+    return null;
+  }
+}
+
+/** Parse simple text: one waypoint per line as IDENT,LAT,LNG or just IDENT */
+function parseTextPlan(text: string): FlightPlanWaypoint[] | null {
+  const lines = text.trim().split(/\n/).map(l => l.trim()).filter(l => l && !l.startsWith("#") && !l.startsWith("//"));
+  if (lines.length < 2) return null;
+
+  const waypoints: FlightPlanWaypoint[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const parts = lines[i].split(/[,\t]+/).map(p => p.trim());
+    const name = parts[0].toUpperCase();
+    const lat = parts.length >= 3 ? parseFloat(parts[1]) : 0;
+    const lng = parts.length >= 3 ? parseFloat(parts[2]) : 0;
+    const isAirport = /^[A-Z]{3,4}$/.test(name) && name.startsWith("K");
+    waypoints.push({
+      id: String(i + 1),
+      name,
+      type: isAirport ? "airport" : "fix",
+      dtk: 0,
+      dis: 0,
+      ete: "00:00",
+      lat,
+      lng,
+    });
+  }
+
+  return computeLegs(waypoints);
+}
+
+/** Compute DTK and DIS between sequential waypoints */
+function computeLegs(waypoints: FlightPlanWaypoint[]): FlightPlanWaypoint[] {
+  for (let i = 1; i < waypoints.length; i++) {
+    const prev = waypoints[i - 1];
+    const cur = waypoints[i];
+    if (prev.lat && prev.lng && cur.lat && cur.lng) {
+      cur.dis = Math.round(distNm(prev.lat, prev.lng, cur.lat, cur.lng) * 10) / 10;
+      cur.dtk = Math.round(bearingDeg(prev.lat, prev.lng, cur.lat, cur.lng));
+    }
+    // Estimate ETE at 120kt GS
+    const eteSec = cur.dis > 0 ? (cur.dis / 120) * 3600 : 0;
+    const m = Math.floor(eteSec / 60);
+    const s = Math.round(eteSec % 60);
+    cur.ete = `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  }
+  return waypoints;
+}
+
+function distNm(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const R = 3440.065;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function bearingDeg(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const y = Math.sin(dLng) * Math.cos((lat2 * Math.PI) / 180);
+  const x = Math.cos((lat1 * Math.PI) / 180) * Math.sin((lat2 * Math.PI) / 180) - Math.sin((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.cos(dLng);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
+
+/* ─── Import Dialog ─── */
+const ImportDialog = ({ onImport, onClose }: { onImport: (plan: FlightPlanWaypoint[]) => void; onClose: () => void }) => {
+  const [tab, setTab] = useState<"file" | "text">("file");
+  const [textInput, setTextInput] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<FlightPlanWaypoint[] | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setError(null);
+    setPreview(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const content = ev.target?.result as string;
+      let plan: FlightPlanWaypoint[] | null = null;
+
+      if (file.name.endsWith(".fpl") || file.name.endsWith(".xml")) {
+        plan = parseGarminFpl(content);
+        if (!plan) setError("Could not parse Garmin FPL file. Check format.");
+      } else if (file.name.endsWith(".txt") || file.name.endsWith(".csv")) {
+        plan = parseTextPlan(content);
+        if (!plan) setError("Need at least 2 waypoints, one per line.");
+      } else {
+        // Try both parsers
+        plan = parseGarminFpl(content) || parseTextPlan(content);
+        if (!plan) setError("Unrecognized file format.");
+      }
+
+      if (plan) setPreview(plan);
+    };
+    reader.readAsText(file);
+  }, []);
+
+  const handleTextParse = () => {
+    setError(null);
+    const plan = parseTextPlan(textInput);
+    if (plan) {
+      setPreview(plan);
+    } else {
+      setError("Need at least 2 waypoints, one per line: IDENT,LAT,LNG");
+    }
+  };
+
+  const handleConfirm = () => {
+    if (preview) {
+      onImport(preview);
+      onClose();
+    }
+  };
+
+  return (
+    <div className="absolute inset-0 z-50 flex flex-col bg-avionics-panel-dark/95 backdrop-blur-sm">
+      {/* Header */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-avionics-divider bg-avionics-panel">
+        <div className="flex items-center gap-2">
+          <Upload className="w-4 h-4 text-avionics-cyan" />
+          <span className="font-mono text-xs text-avionics-white">Import Flight Plan</span>
+        </div>
+        <button onClick={onClose} className="p-1 hover:bg-avionics-button-hover rounded transition-colors">
+          <X className="w-4 h-4 text-avionics-label" />
+        </button>
+      </div>
+
+      {/* Tab bar */}
+      <div className="flex border-b border-avionics-divider">
+        <button
+          onClick={() => { setTab("file"); setError(null); setPreview(null); }}
+          className={`flex-1 py-1.5 text-center font-mono text-[10px] transition-colors ${
+            tab === "file" ? "text-avionics-cyan bg-avionics-button-active border-b-2 border-avionics-cyan" : "text-avionics-label hover:bg-avionics-button-hover"
+          }`}
+        >
+          FILE
+        </button>
+        <button
+          onClick={() => { setTab("text"); setError(null); setPreview(null); }}
+          className={`flex-1 py-1.5 text-center font-mono text-[10px] transition-colors ${
+            tab === "text" ? "text-avionics-cyan bg-avionics-button-active border-b-2 border-avionics-cyan" : "text-avionics-label hover:bg-avionics-button-hover"
+          }`}
+        >
+          TEXT
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-3">
+        {tab === "file" && !preview && (
+          <div className="flex flex-col items-center gap-3">
+            <div className="text-[9px] text-avionics-label font-mono text-center leading-relaxed">
+              Supported formats:<br />
+              • Garmin .fpl (GTN/GNS XML)<br />
+              • Text/CSV (IDENT,LAT,LNG per line)
+            </div>
+            <input ref={fileRef} type="file" accept=".fpl,.xml,.txt,.csv" className="hidden" onChange={handleFile} />
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="flex items-center gap-2 px-4 py-2 bg-avionics-button hover:bg-avionics-button-hover rounded avionics-bezel transition-colors"
+            >
+              <FileText className="w-4 h-4 text-avionics-cyan" />
+              <span className="font-mono text-[10px] text-avionics-white">Choose File</span>
+            </button>
+          </div>
+        )}
+
+        {tab === "text" && !preview && (
+          <div className="flex flex-col gap-2">
+            <div className="text-[9px] text-avionics-label font-mono">
+              Enter waypoints, one per line:<br />
+              IDENT,LAT,LNG (e.g. KSFO,37.6213,-122.3790)
+            </div>
+            <textarea
+              value={textInput}
+              onChange={e => setTextInput(e.target.value)}
+              placeholder={`KSFO,37.6213,-122.3790\nSALIN,36.6628,-121.6064\nKMRY,36.5870,-121.8430`}
+              className="w-full h-32 p-2 bg-avionics-inset text-avionics-white font-mono text-[10px] rounded border border-avionics-divider focus:border-avionics-cyan outline-none resize-none"
+            />
+            <button
+              onClick={handleTextParse}
+              className="self-end px-3 py-1.5 bg-avionics-button hover:bg-avionics-button-hover rounded avionics-bezel font-mono text-[10px] text-avionics-cyan transition-colors"
+            >
+              Parse
+            </button>
+          </div>
+        )}
+
+        {/* Error */}
+        {error && (
+          <div className="flex items-center gap-2 mt-2 px-2 py-1.5 rounded bg-destructive/10 border border-destructive/30">
+            <AlertTriangle className="w-3.5 h-3.5 text-avionics-amber shrink-0" />
+            <span className="font-mono text-[9px] text-avionics-amber">{error}</span>
+          </div>
+        )}
+
+        {/* Preview */}
+        {preview && (
+          <div className="flex flex-col gap-2">
+            <div className="text-[9px] text-avionics-green font-mono">
+              ✓ {preview.length} waypoints parsed
+            </div>
+            <div className="border border-avionics-divider rounded overflow-hidden">
+              <div className="flex items-center px-2 py-1 bg-avionics-panel/50 border-b border-avionics-divider/50 gap-2">
+                <span className="flex-1 text-[8px] text-avionics-label">Waypoint</span>
+                <span className="w-10 text-[8px] text-avionics-label text-right">DTK</span>
+                <span className="w-10 text-[8px] text-avionics-label text-right">DIS</span>
+              </div>
+              <div className="max-h-40 overflow-y-auto">
+                {preview.map((wp, i) => (
+                  <div key={wp.id} className="flex items-center px-2 py-1 gap-2 border-b border-avionics-divider/20">
+                    <span className="flex-1 font-mono text-[10px] text-avionics-white">{wp.name}</span>
+                    <span className="w-10 font-mono text-[10px] text-avionics-magenta text-right">{i > 0 ? `${wp.dtk}°` : "---"}</span>
+                    <span className="w-10 font-mono text-[10px] text-avionics-cyan text-right">{i > 0 ? wp.dis : "---"}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-[9px] text-avionics-label font-mono">
+              Total: <span className="text-avionics-white">{preview.reduce((s, w) => s + w.dis, 0).toFixed(1)} NM</span>
+              &nbsp;•&nbsp; {preview[0]?.name} → {preview[preview.length - 1]?.name}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom actions */}
+      {preview && (
+        <div className="flex items-stretch border-t border-avionics-divider bg-avionics-panel">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2 text-center font-mono text-[10px] text-avionics-label hover:bg-avionics-button-hover border-r border-avionics-divider transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleConfirm}
+            className="flex-1 py-2 text-center font-mono text-[10px] text-avionics-green hover:bg-avionics-button-hover transition-colors"
+          >
+            Load Flight Plan
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ─── Existing Components ─── */
 
 const WaypointIcon = ({ type }: { type: FlightPlanWaypoint["type"] }) => {
   switch (type) {
@@ -35,7 +335,6 @@ const VnavProfile = ({ flightPlan, activeWaypointIndex }: { flightPlan: FlightPl
   const plotH = H - PAD.top - PAD.bottom;
 
   const data = useMemo(() => {
-    // cumulative distance for x-axis
     let cumDist = 0;
     const pts = flightPlan.map((wp, i) => {
       if (i > 0) cumDist += wp.dis;
@@ -55,26 +354,19 @@ const VnavProfile = ({ flightPlan, activeWaypointIndex }: { flightPlan: FlightPl
 
   const { pts, maxAlt, minAlt, toX, toY } = data;
 
-  // Build path line
   const pathD = pts.map((p, i) => `${i === 0 ? "M" : "L"}${toX(p.cumDist).toFixed(1)},${toY(p.alt).toFixed(1)}`).join(" ");
-
-  // Fill area under path
   const fillD = `${pathD} L${toX(pts[pts.length - 1].cumDist).toFixed(1)},${(PAD.top + plotH).toFixed(1)} L${PAD.left},${(PAD.top + plotH).toFixed(1)} Z`;
 
-  // Altitude grid lines
   const altSteps = 4;
   const altGridLines = Array.from({ length: altSteps + 1 }, (_, i) => {
     const alt = minAlt + ((maxAlt - minAlt) * i) / altSteps;
     return { alt: Math.round(alt), y: toY(alt) };
   });
 
-  // Aircraft position (interpolated between active and next)
-  const acIdx = activeWaypointIndex;
-  const acPt = pts[acIdx];
+  const acPt = pts[activeWaypointIndex];
 
   return (
     <svg width="100%" viewBox={`0 0 ${W} ${H}`} className="block">
-      {/* Grid lines */}
       {altGridLines.map((g, i) => (
         <g key={i}>
           <line x1={PAD.left} y1={g.y} x2={W - PAD.right} y2={g.y} stroke="hsl(var(--avionics-divider))" strokeWidth="0.5" strokeDasharray="2,3" />
@@ -84,16 +376,10 @@ const VnavProfile = ({ flightPlan, activeWaypointIndex }: { flightPlan: FlightPl
         </g>
       ))}
 
-      {/* Ground baseline */}
       <line x1={PAD.left} y1={PAD.top + plotH} x2={W - PAD.right} y2={PAD.top + plotH} stroke="hsl(var(--avionics-divider))" strokeWidth="1" />
-
-      {/* Terrain fill (simplified) */}
       <path d={fillD} fill="hsl(var(--avionics-green) / 0.06)" />
-
-      {/* Vertical path line */}
       <path d={pathD} fill="none" stroke="hsl(var(--avionics-magenta))" strokeWidth="1.5" strokeLinejoin="round" />
 
-      {/* Constraint markers at each waypoint */}
       {pts.map((p, i) => {
         const x = toX(p.cumDist);
         const y = toY(p.alt);
@@ -102,25 +388,18 @@ const VnavProfile = ({ flightPlan, activeWaypointIndex }: { flightPlan: FlightPl
 
         return (
           <g key={p.id}>
-            {/* Vertical dashed line from point to baseline */}
             <line x1={x} y1={y} x2={x} y2={PAD.top + plotH} stroke={isPast ? "hsl(var(--avionics-divider))" : "hsl(var(--avionics-cyan) / 0.3)"} strokeWidth="0.5" strokeDasharray="2,2" />
-
-            {/* Constraint diamond */}
             <polygon
               points={`${x},${y - 4} ${x + 3},${y} ${x},${y + 4} ${x - 3},${y}`}
               fill={isActive ? "hsl(var(--avionics-magenta))" : isPast ? "hsl(var(--avionics-divider))" : "hsl(var(--avionics-cyan))"}
               stroke="none"
             />
-
-            {/* Altitude label above */}
             {p.alt > 0 && !isPast && (
               <text x={x} y={y - 7} textAnchor="middle" fontSize="7" fontFamily="monospace"
                 className={isActive ? "fill-avionics-magenta" : "fill-avionics-cyan"}>
                 {p.alt}
               </text>
             )}
-
-            {/* Waypoint name below baseline */}
             <text x={x} y={PAD.top + plotH + 10} textAnchor="middle" fontSize="6.5" fontFamily="monospace"
               className={isActive ? "fill-avionics-magenta" : isPast ? "fill-avionics-label" : "fill-avionics-white"}>
               {p.name}
@@ -129,17 +408,13 @@ const VnavProfile = ({ flightPlan, activeWaypointIndex }: { flightPlan: FlightPl
         );
       })}
 
-      {/* Aircraft symbol */}
       {acPt && (
         <g transform={`translate(${toX(acPt.cumDist)}, ${toY(acPt.alt)})`}>
-          {/* Aircraft icon */}
           <polygon points="0,-5 3,3 0,1 -3,3" fill="hsl(var(--avionics-green))" />
-          {/* Glow circle */}
           <circle r="6" fill="hsl(var(--avionics-green) / 0.15)" />
         </g>
       )}
 
-      {/* VNAV label */}
       <text x={PAD.left + 2} y={PAD.top - 6} fontSize="8" fontFamily="monospace" className="fill-avionics-cyan" fontWeight="bold">
         VNAV PROFILE
       </text>
@@ -151,14 +426,14 @@ const VnavProfile = ({ flightPlan, activeWaypointIndex }: { flightPlan: FlightPl
 };
 
 export const FlightPlanScreen = () => {
-  const { flightPlan, activeWaypointIndex, setActiveWaypoint, navigateTo } = useGtn();
+  const { flightPlan, activeWaypointIndex, setActiveWaypoint, setFlightPlan, navigateTo } = useGtn();
   const [selectedWp, setSelectedWp] = useState<number | null>(null);
   const [showVnav, setShowVnav] = useState(true);
+  const [showImport, setShowImport] = useState(false);
 
   const totalDist = flightPlan.reduce((sum, wp) => sum + wp.dis, 0);
   const remainingDist = flightPlan.slice(activeWaypointIndex).reduce((sum, wp) => sum + wp.dis, 0);
 
-  // Compute VNAV stats
   const activeAlt = flightPlan[activeWaypointIndex]?.alt || 0;
   const nextConstraintIdx = flightPlan.findIndex((wp, i) => i > activeWaypointIndex && wp.alt);
   const nextConstraint = nextConstraintIdx >= 0 ? flightPlan[nextConstraintIdx] : null;
@@ -167,11 +442,19 @@ export const FlightPlanScreen = () => {
     ? flightPlan.slice(activeWaypointIndex, nextConstraintIdx + 1).reduce((s, w) => s + w.dis, 0)
     : 0;
   const requiredVs = distToConstraint > 0 && vnavTargetAlt !== activeAlt
-    ? Math.round(((vnavTargetAlt - activeAlt) / distToConstraint) * 100) // rough fpm proxy
+    ? Math.round(((vnavTargetAlt - activeAlt) / distToConstraint) * 100)
     : 0;
 
   return (
-    <div className="flex-1 flex flex-col bg-avionics-panel-dark overflow-hidden">
+    <div className="flex-1 flex flex-col bg-avionics-panel-dark overflow-hidden relative">
+      {/* Import dialog overlay */}
+      {showImport && (
+        <ImportDialog
+          onImport={(plan) => setFlightPlan(plan)}
+          onClose={() => setShowImport(false)}
+        />
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-1.5 bg-avionics-panel border-b border-avionics-divider">
         <div className="flex items-center gap-2">
@@ -185,6 +468,13 @@ export const FlightPlanScreen = () => {
             }`}
           >
             VNAV
+          </button>
+          <button
+            onClick={() => setShowImport(true)}
+            className="px-2 py-0.5 rounded text-[8px] font-mono avionics-bezel bg-avionics-button text-avionics-cyan hover:bg-avionics-button-hover transition-colors flex items-center gap-1"
+          >
+            <Upload className="w-3 h-3" />
+            IMPORT
           </button>
         </div>
         <div className="flex items-center gap-3">
@@ -201,7 +491,6 @@ export const FlightPlanScreen = () => {
       {showVnav && (
         <div className="border-b border-avionics-divider bg-avionics-panel-dark">
           <VnavProfile flightPlan={flightPlan} activeWaypointIndex={activeWaypointIndex} />
-          {/* VNAV data strip */}
           <div className="flex items-center justify-between px-3 py-1 border-t border-avionics-divider/50 bg-avionics-panel/30">
             <div className="flex items-center gap-3">
               <span className="text-[8px] text-avionics-label font-mono">
