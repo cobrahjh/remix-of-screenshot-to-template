@@ -32,10 +32,12 @@ import { ChecklistsScreen } from "@/components/avionics/screens/ChecklistsScreen
 import { SafeTaxiScreen } from "@/components/avionics/screens/SafeTaxiScreen";
 import { PlaceholderScreen } from "@/components/avionics/screens/PlaceholderScreen";
 import { CdiBar } from "@/components/avionics/CdiBar";
-import { Home, Navigation } from "lucide-react";
+import { useState } from "react";
+import { Home, Navigation, ChevronUp, ChevronDown } from "lucide-react";
 
 const GtnDisplay = () => {
   const { currentPage, comPanelOpen, audioPanelOpen, xpdrPanelOpen, navigateTo, smartGlideActive, directToTarget } = useGtn();
+  const [tabsCollapsed, setTabsCollapsed] = useState(false);
 
   const renderScreen = () => {
     switch (currentPage) {
@@ -123,38 +125,80 @@ const GtnDisplay = () => {
       </div>
 
       {/* Page locator bar */}
-      <div className="flex items-center bg-avionics-panel-dark border-b border-avionics-divider px-1 overflow-x-auto">
-        {([
-          { label: "PFD", page: "pfd" as const },
-          { label: "NAV MAP", page: "map" as const },
-          { label: "FPL", page: "flightplan" as const },
-          { label: "TRFC", page: "traffic" as const },
-          { label: "TERR", page: "terrain" as const },
-          { label: "WX", page: "weather" as const },
-          { label: "WPT", page: "waypoint" as const },
-          { label: "CHRT", page: "charts" as const },
-          { label: "PROC", page: "proc" as const },
-          { label: "NRST", page: "nearest" as const },
-          { label: "FUEL", page: "fuel" as const },
-          { label: "VCALC", page: "vcalc" as const },
-          { label: "TRIP", page: "trip" as const },
-          { label: "DALT", page: "dalt" as const },
-          { label: "CHKL", page: "checklists" as const },
-          { label: "TAXI", page: "safetaxi" as const },
-          { label: "SVC", page: "services" as const },
-        ]).map((tab) => (
-          <button
-            key={tab.page}
-            onClick={() => navigateTo(tab.page)}
-            className={`px-1.5 py-[3px] text-[8px] font-mono whitespace-nowrap transition-colors ${
-              currentPage === tab.page
-                ? "text-avionics-cyan bg-avionics-button border-b border-avionics-cyan"
-                : "text-avionics-label hover:text-avionics-white"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="flex items-center bg-avionics-panel-dark border-b border-avionics-divider">
+        {/* Collapse toggle */}
+        <button
+          onClick={() => setTabsCollapsed(c => !c)}
+          className="px-1 py-1 flex items-center justify-center hover:bg-avionics-button-hover transition-colors border-r border-avionics-divider shrink-0"
+          title={tabsCollapsed ? "Expand tabs" : "Collapse tabs"}
+        >
+          {tabsCollapsed
+            ? <ChevronDown className="w-3.5 h-3.5 text-avionics-cyan" />
+            : <ChevronUp className="w-3.5 h-3.5 text-avionics-cyan" />
+          }
+        </button>
+
+        {tabsCollapsed ? (
+          /* Collapsed: show only active page label */
+          <span className="px-2 py-[3px] text-[8px] font-mono text-avionics-cyan">
+            {currentPage.toUpperCase()}
+          </span>
+        ) : (
+          /* Expanded: two rows of tabs, most-used first */
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Row 1: Most used */}
+            <div className="flex items-center overflow-x-auto px-0.5">
+              {([
+                { label: "NAV MAP", page: "map" as const },
+                { label: "FPL", page: "flightplan" as const },
+                { label: "PFD", page: "pfd" as const },
+                { label: "WX", page: "weather" as const },
+                { label: "CHRT", page: "charts" as const },
+                { label: "TAXI", page: "safetaxi" as const },
+                { label: "PROC", page: "proc" as const },
+                { label: "NRST", page: "nearest" as const },
+              ]).map((tab) => (
+                <button
+                  key={tab.page}
+                  onClick={() => navigateTo(tab.page)}
+                  className={`px-1.5 py-[3px] text-[8px] font-mono whitespace-nowrap transition-colors ${
+                    currentPage === tab.page
+                      ? "text-avionics-cyan bg-avionics-button border-b border-avionics-cyan"
+                      : "text-avionics-label hover:text-avionics-white"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            {/* Row 2: Secondary */}
+            <div className="flex items-center overflow-x-auto px-0.5 border-t border-avionics-divider/30">
+              {([
+                { label: "TRFC", page: "traffic" as const },
+                { label: "TERR", page: "terrain" as const },
+                { label: "WPT", page: "waypoint" as const },
+                { label: "FUEL", page: "fuel" as const },
+                { label: "VCALC", page: "vcalc" as const },
+                { label: "TRIP", page: "trip" as const },
+                { label: "DALT", page: "dalt" as const },
+                { label: "CHKL", page: "checklists" as const },
+                { label: "SVC", page: "services" as const },
+              ]).map((tab) => (
+                <button
+                  key={tab.page}
+                  onClick={() => navigateTo(tab.page)}
+                  className={`px-1.5 py-[3px] text-[8px] font-mono whitespace-nowrap transition-colors ${
+                    currentPage === tab.page
+                      ? "text-avionics-cyan bg-avionics-button border-b border-avionics-cyan"
+                      : "text-avionics-label hover:text-avionics-white"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Top frequency bar */}
