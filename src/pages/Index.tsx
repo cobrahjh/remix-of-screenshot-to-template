@@ -101,7 +101,7 @@ const GtnDisplay = () => {
       {/* Header */}
       <div className={`border-b border-avionics-divider px-3 py-1 flex items-center justify-between ${smartGlideActive ? "bg-destructive/20" : "bg-avionics-panel"}`}>
         <span className="font-body text-[10px] text-avionics-label tracking-[0.3em] uppercase font-semibold">
-          {smartGlideActive ? "⚠ EMERGENCY" : "Avionics"}
+          {smartGlideActive ? "⚠ EMERGENCY" : "SIMGLASS AVIONICS"}
         </span>
         <div className="flex items-center gap-2">
           {directToTarget && (
