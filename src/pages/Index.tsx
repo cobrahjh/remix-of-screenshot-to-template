@@ -100,13 +100,11 @@ const GtnDisplay = () => {
   return (
     <div className="w-full max-w-md rounded-xl overflow-hidden avionics-bezel border-2 border-avionics-divider bg-avionics-panel-dark flex flex-col" style={{ height: "min(85vh, 680px)" }}>
       {/* Header */}
-      <div className={`border-b border-avionics-divider px-3 py-1 flex items-center justify-between ${smartGlideActive ? "bg-destructive/20" : "bg-avionics-panel"}`}>
-        <div className="flex items-center gap-1.5">
-          <img src={simglassLogo} alt="SimGlass logo" className="w-7 h-7 rounded-sm" />
-          <span className="font-body text-[13px] text-avionics-label tracking-[0.3em] uppercase font-semibold">
-            {smartGlideActive ? "⚠ EMERGENCY" : "SIMGLASS AVIONICS"}
-          </span>
-        </div>
+      <div className={`relative border-b border-avionics-divider px-3 py-1 flex items-center justify-between ${smartGlideActive ? "bg-destructive/20" : "bg-avionics-panel"}`}>
+        <img src={simglassLogo} alt="SimGlass logo" className="absolute left-2 top-1/2 -translate-y-1/2 w-14 h-14 opacity-25 pointer-events-none" />
+        <span className="relative z-10 font-body text-[13px] text-avionics-label tracking-[0.3em] uppercase font-semibold">
+          {smartGlideActive ? "⚠ EMERGENCY" : "SIMGLASS AVIONICS"}
+        </span>
         <div className="flex items-center gap-2">
           {directToTarget && (
             <span className="font-mono text-[9px] text-avionics-magenta">D→ {directToTarget}</span>
