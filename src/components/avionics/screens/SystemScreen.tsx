@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useFlightData, ConnectionMode } from "../FlightDataContext";
-import { Wifi, WifiOff, TestTube2 } from "lucide-react";
+import { Wifi, WifiOff, TestTube2, Check } from "lucide-react";
 
 type Tab = "conn" | "setup" | "gps" | "units" | "database" | "backlight";
 
@@ -292,6 +292,163 @@ const ConnectionTab = () => {
   );
 };
 
+// ── Color Schemes ──────────────────────────────────────────────
+interface ColorScheme {
+  id: string;
+  name: string;
+  preview: { primary: string; accent: string; bg: string; text: string };
+  vars: Record<string, string>;
+}
+
+const COLOR_SCHEMES: ColorScheme[] = [
+  {
+    id: "default",
+    name: "Standard",
+    preview: { primary: "hsl(160,100%,45%)", accent: "hsl(185,100%,55%)", bg: "hsl(220,20%,8%)", text: "hsl(0,0%,92%)" },
+    vars: {
+      "--avionics-green": "160 100% 45%",
+      "--avionics-cyan": "185 100% 55%",
+      "--avionics-magenta": "300 80% 60%",
+      "--avionics-amber": "40 100% 55%",
+    },
+  },
+  {
+    id: "neon",
+    name: "Neon",
+    preview: { primary: "hsl(130,100%,50%)", accent: "hsl(170,100%,50%)", bg: "hsl(220,20%,8%)", text: "hsl(0,0%,92%)" },
+    vars: {
+      "--avionics-green": "130 100% 50%",
+      "--avionics-cyan": "170 100% 50%",
+      "--avionics-magenta": "320 100% 60%",
+      "--avionics-amber": "50 100% 55%",
+    },
+  },
+  {
+    id: "military",
+    name: "Military",
+    preview: { primary: "hsl(120,60%,40%)", accent: "hsl(80,50%,45%)", bg: "hsl(220,20%,8%)", text: "hsl(0,0%,92%)" },
+    vars: {
+      "--avionics-green": "120 60% 40%",
+      "--avionics-cyan": "80 50% 45%",
+      "--avionics-magenta": "45 80% 50%",
+      "--avionics-amber": "30 80% 45%",
+    },
+  },
+  {
+    id: "ocean",
+    name: "Ocean",
+    preview: { primary: "hsl(200,90%,50%)", accent: "hsl(175,80%,50%)", bg: "hsl(220,20%,8%)", text: "hsl(0,0%,92%)" },
+    vars: {
+      "--avionics-green": "175 80% 50%",
+      "--avionics-cyan": "200 90% 50%",
+      "--avionics-magenta": "260 70% 60%",
+      "--avionics-amber": "35 90% 55%",
+    },
+  },
+  {
+    id: "sunset",
+    name: "Sunset",
+    preview: { primary: "hsl(30,100%,55%)", accent: "hsl(350,80%,55%)", bg: "hsl(220,20%,8%)", text: "hsl(0,0%,92%)" },
+    vars: {
+      "--avionics-green": "30 100% 55%",
+      "--avionics-cyan": "350 80% 55%",
+      "--avionics-magenta": "280 70% 55%",
+      "--avionics-amber": "50 100% 50%",
+    },
+  },
+  {
+    id: "arctic",
+    name: "Arctic",
+    preview: { primary: "hsl(210,60%,70%)", accent: "hsl(190,50%,65%)", bg: "hsl(220,20%,8%)", text: "hsl(0,0%,92%)" },
+    vars: {
+      "--avionics-green": "210 60% 70%",
+      "--avionics-cyan": "190 50% 65%",
+      "--avionics-magenta": "240 50% 70%",
+      "--avionics-amber": "45 70% 65%",
+    },
+  },
+];
+
+const DisplayTab = () => {
+  const [activeScheme, setActiveScheme] = useState(() => {
+    return localStorage.getItem("avionics-color-scheme") || "default";
+  });
+  const [brightness, setBrightness] = useState(100);
+
+  const applyScheme = useCallback((schemeId: string) => {
+    const scheme = COLOR_SCHEMES.find((s) => s.id === schemeId);
+    if (!scheme) return;
+    const root = document.documentElement;
+    Object.entries(scheme.vars).forEach(([key, value]) => {
+      root.style.setProperty(key, value);
+    });
+    setActiveScheme(schemeId);
+    localStorage.setItem("avionics-color-scheme", schemeId);
+  }, []);
+
+  // Apply saved scheme on mount
+  useEffect(() => {
+    applyScheme(activeScheme);
+  }, []);
+
+  return (
+    <div>
+      {/* Backlight */}
+      <div className="p-3 border-b border-avionics-divider">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[10px] text-avionics-white">Backlight Level</span>
+          <span className="font-mono text-xs text-avionics-green">{brightness}%</span>
+        </div>
+        <div className="w-full h-2 bg-avionics-inset rounded-full overflow-hidden">
+          <div className="h-full bg-avionics-green rounded-full transition-all" style={{ width: `${brightness}%` }} />
+        </div>
+        <div className="mt-2">
+          <SettingRow label="Auto Brightness" value="On" color="text-avionics-green" />
+          <SettingRow label="Night Mode" value="Off" />
+        </div>
+      </div>
+
+      {/* Color Scheme Selector */}
+      <div className="px-3 py-1.5 border-b border-avionics-divider">
+        <span className="font-mono text-[9px] text-avionics-amber">COLOR SCHEME</span>
+      </div>
+      <div className="grid grid-cols-2 gap-2 p-3">
+        {COLOR_SCHEMES.map((scheme) => {
+          const isActive = activeScheme === scheme.id;
+          return (
+            <button
+              key={scheme.id}
+              onClick={() => applyScheme(scheme.id)}
+              className={`relative flex flex-col items-center gap-1.5 p-2 rounded border transition-all ${
+                isActive
+                  ? "border-avionics-cyan bg-avionics-button-active"
+                  : "border-avionics-divider/50 bg-avionics-inset hover:border-avionics-divider hover:bg-avionics-button"
+              }`}
+            >
+              {/* Preview swatch */}
+              <div
+                className="w-full h-5 rounded-sm flex overflow-hidden"
+                style={{ background: scheme.preview.bg }}
+              >
+                <div className="flex-1" style={{ background: scheme.preview.primary, opacity: 0.85 }} />
+                <div className="flex-1" style={{ background: scheme.preview.accent, opacity: 0.85 }} />
+              </div>
+              <span className={`font-mono text-[9px] ${isActive ? "text-avionics-cyan" : "text-avionics-label"}`}>
+                {scheme.name}
+              </span>
+              {isActive && (
+                <div className="absolute top-1 right-1">
+                  <Check className="w-3 h-3 text-avionics-cyan" />
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 export const SystemScreen = () => {
   const [activeTab, setActiveTab] = useState<Tab>("conn");
 
@@ -334,22 +491,7 @@ export const SystemScreen = () => {
         {activeTab === "gps" && <GpsTab />}
         {activeTab === "units" && <UnitsTab />}
         {activeTab === "database" && <DatabaseTab />}
-        {activeTab === "backlight" && (
-          <div className="p-4">
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-avionics-white">Backlight Level</span>
-                <span className="font-mono text-xs text-avionics-green">100%</span>
-              </div>
-              <div className="w-full h-2 bg-avionics-inset rounded-full overflow-hidden">
-                <div className="h-full bg-avionics-green rounded-full" style={{ width: "100%" }} />
-              </div>
-              <SettingRow label="Auto Brightness" value="On" color="text-avionics-green" />
-              <SettingRow label="Manual Offset" value="+0.0%" />
-              <SettingRow label="Night Mode" value="Off" />
-            </div>
-          </div>
-        )}
+        {activeTab === "backlight" && <DisplayTab />}
       </div>
     </div>
   );
