@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useFlightData } from "../FlightDataContext";
-import { PlaneTakeoff, AlertTriangle, ChevronDown, ChevronUp, Wind } from "lucide-react";
+import { PlaneTakeoff, AlertTriangle, ChevronDown, ChevronUp, Wind, Radio } from "lucide-react";
 
 interface RunwayData {
   id: string;
@@ -740,6 +740,141 @@ const WINDS: Record<string, { direction: number; speed: number; gust?: number }>
   KONT: { direction: 260, speed: 9 },
 };
 
+// Simulated D-ATIS data per airport
+interface AtisData {
+  identifier: string; // ATIS letter (Alpha, Bravo, etc.)
+  time: string; // Zulu time
+  wind: string;
+  visibility: string;
+  ceiling: string;
+  temperature: string;
+  dewpoint: string;
+  altimeter: string;
+  remarks: string;
+  runwaysInUse: string;
+  approachType: string;
+}
+
+const ATIS_DATA: Record<string, AtisData> = {
+  KMRY: {
+    identifier: "GOLF",
+    time: "1755Z",
+    wind: "280 AT 12 GUSTS 18",
+    visibility: "10",
+    ceiling: "SCT025 BKN045",
+    temperature: "14",
+    dewpoint: "08",
+    altimeter: "30.12",
+    remarks: "BIRDS IN VICINITY",
+    runwaysInUse: "RWY 28L/28R IN USE",
+    approachType: "ILS RWY 28L",
+  },
+  KSNS: {
+    identifier: "CHARLIE",
+    time: "1750Z",
+    wind: "310 AT 8",
+    visibility: "10",
+    ceiling: "CLR",
+    temperature: "16",
+    dewpoint: "06",
+    altimeter: "30.14",
+    remarks: "PARACHUTE JUMPING VICINITY",
+    runwaysInUse: "RWY 26 IN USE",
+    approachType: "VISUAL APCH",
+  },
+  KSJC: {
+    identifier: "HOTEL",
+    time: "1800Z",
+    wind: "300 AT 14 GUSTS 22",
+    visibility: "8",
+    ceiling: "FEW018 SCT030",
+    temperature: "15",
+    dewpoint: "09",
+    altimeter: "30.08",
+    remarks: "RNAV APCH IN USE. READBACK ALL RWY HOLD SHORT INSTRUCTIONS",
+    runwaysInUse: "RWY 30L/30R IN USE",
+    approachType: "ILS RWY 30R",
+  },
+  KSFO: {
+    identifier: "LIMA",
+    time: "1755Z",
+    wind: "270 AT 18 GUSTS 28",
+    visibility: "6",
+    ceiling: "OVC012",
+    temperature: "12",
+    dewpoint: "10",
+    altimeter: "29.98",
+    remarks: "LOW CEILINGS APCH. SIMUL VISUAL APCH IN PROGRESS. HEAVY TRAFFIC DELAYS EXPECT HOLDING",
+    runwaysInUse: "RWY 28L/28R IN USE",
+    approachType: "ILS RWY 28R CAT III",
+  },
+  KOAK: {
+    identifier: "ECHO",
+    time: "1745Z",
+    wind: "290 AT 10",
+    visibility: "10",
+    ceiling: "SCT035",
+    temperature: "14",
+    dewpoint: "07",
+    altimeter: "30.02",
+    remarks: "NOISE ABATEMENT IN EFFECT",
+    runwaysInUse: "RWY 30/28R IN USE",
+    approachType: "ILS RWY 30",
+  },
+  KLAX: {
+    identifier: "NOVEMBER",
+    time: "1800Z",
+    wind: "250 AT 8",
+    visibility: "10",
+    ceiling: "CLR ABV 250",
+    temperature: "18",
+    dewpoint: "11",
+    altimeter: "30.10",
+    remarks: "WESTBOUND OPERATIONS IN EFFECT. SIMULTANEOUS PARALLEL APPROACHES IN USE",
+    runwaysInUse: "RWY 24L/24R 25L/25R IN USE",
+    approachType: "ILS/VISUAL RWY 24R/25L",
+  },
+  KSAN: {
+    identifier: "FOXTROT",
+    time: "1750Z",
+    wind: "270 AT 6",
+    visibility: "10",
+    ceiling: "FEW025",
+    temperature: "17",
+    dewpoint: "12",
+    altimeter: "30.06",
+    remarks: "CONSTRUCTION SOUTH SIDE. FOLLOW MARSHALLER TO GATE",
+    runwaysInUse: "RWY 27 IN USE",
+    approachType: "VISUAL RWY 27",
+  },
+  KBUR: {
+    identifier: "DELTA",
+    time: "1755Z",
+    wind: "260 AT 11 GUSTS 16",
+    visibility: "7",
+    ceiling: "SCT020 BKN035",
+    temperature: "16",
+    dewpoint: "10",
+    altimeter: "30.04",
+    remarks: "RWY 15/33 CLSD. MOUNTAINOUS TERRAIN ALL QUADRANTS",
+    runwaysInUse: "RWY 26 IN USE",
+    approachType: "ILS/LOC RWY 08",
+  },
+  KONT: {
+    identifier: "BRAVO",
+    time: "1745Z",
+    wind: "260 AT 9",
+    visibility: "10",
+    ceiling: "CLR",
+    temperature: "20",
+    dewpoint: "08",
+    altimeter: "30.08",
+    remarks: "BIRD ACTIVITY. CARGO OPS EAST SIDE",
+    runwaysInUse: "RWY 26R/26L IN USE",
+    approachType: "ILS RWY 26L",
+  },
+};
+
 // Determine which runway heading is preferred given wind direction
 const getPreferredRunways = (runways: RunwayData[], windDir: number): Set<string> => {
   const preferred = new Set<string>();
@@ -764,10 +899,12 @@ export const SafeTaxiScreen = () => {
   const { flight } = useFlightData();
   const [selectedAirport, setSelectedAirport] = useState<string>("KMRY");
   const [notamsOpen, setNotamsOpen] = useState(false);
+  const [atisOpen, setAtisOpen] = useState(false);
 
   const airport = AIRPORTS[selectedAirport];
   const notams = NOTAMS[selectedAirport] || [];
   const wind = WINDS[selectedAirport] || { direction: 0, speed: 0 };
+  const atis = ATIS_DATA[selectedAirport];
 
   const preferredRunways = useMemo(
     () => getPreferredRunways(airport.runways, wind.direction),
@@ -872,6 +1009,75 @@ export const SafeTaxiScreen = () => {
           </div>
         )}
       </div>
+
+      {/* D-ATIS Panel */}
+      {atis && (
+        <div className="border-b border-avionics-divider/50">
+          <button
+            onClick={() => setAtisOpen(!atisOpen)}
+            className="w-full flex items-center justify-between px-3 py-1 bg-avionics-panel hover:bg-avionics-button transition-colors"
+          >
+            <div className="flex items-center gap-1.5">
+              <Radio className="w-3 h-3 text-avionics-cyan" />
+              <span className="font-mono text-[9px] text-avionics-white">
+                D-ATIS
+              </span>
+              <span className="font-mono text-[8px] text-avionics-cyan px-1 py-px border border-avionics-cyan/40 rounded">
+                INFO {atis.identifier}
+              </span>
+              <span className="font-mono text-[7px] text-avionics-label">{atis.time}</span>
+            </div>
+            {atisOpen ? (
+              <ChevronUp className="w-3 h-3 text-avionics-label" />
+            ) : (
+              <ChevronDown className="w-3 h-3 text-avionics-label" />
+            )}
+          </button>
+          {atisOpen && (
+            <div className="bg-avionics-inset px-3 py-1.5 max-h-[130px] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                <div className="flex items-center gap-1">
+                  <span className="font-mono text-[7px] text-avionics-label">WIND</span>
+                  <span className="font-mono text-[8px] text-avionics-green">{atis.wind}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="font-mono text-[7px] text-avionics-label">VIS</span>
+                  <span className="font-mono text-[8px] text-avionics-white">{atis.visibility} SM</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="font-mono text-[7px] text-avionics-label">CIG</span>
+                  <span className={`font-mono text-[8px] ${
+                    atis.ceiling.includes("OVC") && parseInt(atis.ceiling.match(/\d+/)?.[0] || "99") < 20
+                      ? "text-avionics-amber"
+                      : "text-avionics-white"
+                  }`}>{atis.ceiling}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="font-mono text-[7px] text-avionics-label">TEMP/DP</span>
+                  <span className="font-mono text-[8px] text-avionics-white">{atis.temperature}°/{atis.dewpoint}°C</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="font-mono text-[7px] text-avionics-label">ALTM</span>
+                  <span className="font-mono text-[8px] text-avionics-cyan">{atis.altimeter}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="font-mono text-[7px] text-avionics-label">APCH</span>
+                  <span className="font-mono text-[8px] text-avionics-magenta">{atis.approachType}</span>
+                </div>
+              </div>
+              <div className="mt-1 pt-1 border-t border-avionics-divider/30">
+                <span className="font-mono text-[8px] text-avionics-green block">{atis.runwaysInUse}</span>
+              </div>
+              {atis.remarks && (
+                <div className="mt-0.5">
+                  <span className="font-mono text-[7px] text-avionics-label">RMK: </span>
+                  <span className="font-mono text-[7px] text-avionics-amber">{atis.remarks}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* SVG Airport Diagram */}
       <div className="flex-1 relative overflow-hidden">
