@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useFlightData, ConnectionMode } from "../FlightDataContext";
-import { Wifi, WifiOff, TestTube2, Check, Save, Trash2, PenLine, Plus, Sun, Moon, Download, Upload } from "lucide-react";
+import { Wifi, WifiOff, TestTube2, Check, Save, Trash2, PenLine, Plus, Sun, Moon, Download, Upload, Eye } from "lucide-react";
 
 type Tab = "conn" | "setup" | "gps" | "units" | "database" | "backlight";
 
@@ -442,9 +442,11 @@ const DisplayTab = () => {
   const [activeSchemeId, setActiveSchemeId] = useState(() =>
     localStorage.getItem("avionics-color-scheme") || "default"
   );
-  const [darkMode, setDarkMode] = useState(() => {
+  type DisplayMode = "dark" | "light" | "high-contrast";
+  const [displayMode, setDisplayMode] = useState<DisplayMode>(() => {
     const saved = localStorage.getItem("avionics-display-mode");
-    return saved !== "light";
+    if (saved === "light" || saved === "high-contrast") return saved;
+    return "dark";
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState(false);
@@ -452,16 +454,22 @@ const DisplayTab = () => {
   const [editName, setEditName] = useState("");
   const [brightness, setBrightness] = useState(100);
 
-  // Apply dark/light mode
+  // Apply display mode
   useEffect(() => {
     const root = document.documentElement;
-    if (darkMode) {
-      root.classList.remove("light");
-    } else {
-      root.classList.add("light");
-    }
-    localStorage.setItem("avionics-display-mode", darkMode ? "dark" : "light");
-  }, [darkMode]);
+    root.classList.remove("light", "high-contrast");
+    if (displayMode === "light") root.classList.add("light");
+    else if (displayMode === "high-contrast") root.classList.add("high-contrast");
+    localStorage.setItem("avionics-display-mode", displayMode);
+  }, [displayMode]);
+
+  const cycleDisplayMode = () => {
+    setDisplayMode((prev) => {
+      if (prev === "dark") return "light";
+      if (prev === "light") return "high-contrast";
+      return "dark";
+    });
+  };
 
   const applyVars = useCallback((vars: Record<string, string>) => {
     const root = document.documentElement;
@@ -637,30 +645,48 @@ const DisplayTab = () => {
         </div>
       </div>
 
-      {/* Dark / Light Mode Toggle */}
+      {/* Display Mode Toggle */}
       <div className="px-3 py-2 border-b border-avionics-divider">
         <div className="flex items-center justify-between">
           <span className="font-mono text-[9px] text-avionics-amber">DISPLAY MODE</span>
           <button
-            onClick={() => setDarkMode((prev) => !prev)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded border transition-all ${
-              darkMode
-                ? "border-avionics-cyan/40 bg-avionics-button"
-                : "border-avionics-amber/40 bg-avionics-button"
-            }`}
+            onClick={cycleDisplayMode}
+            className="flex items-center gap-2 px-3 py-1.5 rounded border border-avionics-divider bg-avionics-button transition-all hover:bg-avionics-button-hover"
           >
-            {darkMode ? (
+            {displayMode === "dark" && (
               <>
                 <Moon className="w-3 h-3 text-avionics-cyan" />
                 <span className="font-mono text-[9px] text-avionics-cyan">DARK</span>
               </>
-            ) : (
+            )}
+            {displayMode === "light" && (
               <>
                 <Sun className="w-3 h-3 text-avionics-amber" />
                 <span className="font-mono text-[9px] text-avionics-amber">LIGHT</span>
               </>
             )}
+            {displayMode === "high-contrast" && (
+              <>
+                <Eye className="w-3 h-3 text-avionics-green" />
+                <span className="font-mono text-[9px] text-avionics-green">HI-CON</span>
+              </>
+            )}
           </button>
+        </div>
+        <div className="flex items-center gap-1 mt-1.5">
+          {(["dark", "light", "high-contrast"] as DisplayMode[]).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setDisplayMode(mode)}
+              className={`flex-1 py-1 text-[7px] font-mono rounded border transition-all ${
+                displayMode === mode
+                  ? "border-avionics-cyan bg-avionics-button-active text-avionics-cyan"
+                  : "border-avionics-divider/30 bg-avionics-inset text-avionics-label hover:bg-avionics-button"
+              }`}
+            >
+              {mode === "high-contrast" ? "HI-CON" : mode.toUpperCase()}
+            </button>
+          ))}
         </div>
       </div>
 
