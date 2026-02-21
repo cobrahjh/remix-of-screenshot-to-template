@@ -221,6 +221,7 @@ export const MapDisplay = () => {
   const procLayers = useRef<L.LayerGroup | null>(null);
   const rangeLayers = useRef<L.LayerGroup | null>(null);
   const terrainLayer = useRef<L.GridLayer | null>(null);
+  const baseTileLayer = useRef<L.TileLayer | null>(null);
   const { flightPlan, activeWaypointIndex, registerMapZoom } = useGtn();
   const { flight, connectionMode } = useFlightData();
   const isLive = connectionMode !== "none";
@@ -309,10 +310,13 @@ export const MapDisplay = () => {
       markerZoomAnimation: true,
     });
 
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-      maxZoom: 19,
-      noWrap: false,
-    }).addTo(map);
+    const isDark = !document.documentElement.classList.contains("light");
+    baseTileLayer.current = L.tileLayer(
+      isDark
+        ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+      { maxZoom: 19, noWrap: false }
+    ).addTo(map);
 
     // Flight plan route polyline (magenta)
     const routeCoords = flightPlan.map((wp) => [wp.lat, wp.lng] as L.LatLngTuple);
@@ -373,8 +377,22 @@ export const MapDisplay = () => {
       () => map.zoomOut(1, { animate: true }),
     );
 
-    return () => { map.remove(); mapInstance.current = null; aircraftMarker.current = null; nexradLayer.current = null; metarMarkers.current = null; airwayLayers.current = null; procLayers.current = null; rangeLayers.current = null; terrainLayer.current = null; };
+    return () => { map.remove(); mapInstance.current = null; aircraftMarker.current = null; nexradLayer.current = null; metarMarkers.current = null; airwayLayers.current = null; procLayers.current = null; rangeLayers.current = null; terrainLayer.current = null; baseTileLayer.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sync base tile layer with dark/light display mode
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      if (!mapInstance.current || !baseTileLayer.current) return;
+      const isDark = !document.documentElement.classList.contains("light");
+      const newUrl = isDark
+        ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+      baseTileLayer.current.setUrl(newUrl);
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
   }, []);
 
   // Toggle NEXRAD layer
