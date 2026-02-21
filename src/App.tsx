@@ -8,6 +8,36 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+// Restore display mode on app load
+(() => {
+  const mode = localStorage.getItem("avionics-display-mode");
+  if (mode === "light") {
+    document.documentElement.classList.add("light");
+  } else {
+    document.documentElement.classList.remove("light");
+  }
+})();
+
+// Restore color scheme on app load
+(() => {
+  const schemeId = localStorage.getItem("avionics-color-scheme");
+  if (schemeId) {
+    try {
+      // Check user schemes first
+      const userRaw = localStorage.getItem("avionics-user-schemes");
+      const userSchemes = userRaw ? JSON.parse(userRaw) : [];
+      const allSchemes = [
+        { id: "default", vars: { "--avionics-green": "160 100% 45%", "--avionics-cyan": "185 100% 55%", "--avionics-magenta": "300 80% 60%", "--avionics-amber": "40 100% 55%" } },
+        ...userSchemes,
+      ];
+      const scheme = allSchemes.find((s: any) => s.id === schemeId);
+      if (scheme) {
+        Object.entries(scheme.vars).forEach(([k, v]) => document.documentElement.style.setProperty(k, v as string));
+      }
+    } catch {}
+  }
+})();
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>

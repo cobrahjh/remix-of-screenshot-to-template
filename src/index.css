@@ -60,6 +60,56 @@
     --sidebar-border: 220 15% 22%;
     --sidebar-ring: 160 100% 45%;
   }
+
+  :root.light {
+    --background: 210 20% 92%;
+    --foreground: 220 20% 12%;
+
+    --card: 210 15% 96%;
+    --card-foreground: 220 20% 12%;
+
+    --popover: 210 15% 96%;
+    --popover-foreground: 220 20% 12%;
+
+    --primary: 160 100% 32%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 12% 82%;
+    --secondary-foreground: 220 15% 20%;
+
+    --muted: 210 10% 88%;
+    --muted-foreground: 220 10% 40%;
+
+    --accent: 300 60% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 210 12% 78%;
+    --input: 210 12% 78%;
+    --ring: 160 100% 32%;
+
+    /* Aviation-specific tokens — light */
+    --avionics-white: 220 20% 12%;
+    --avionics-panel: 210 15% 88%;
+    --avionics-panel-dark: 210 20% 92%;
+    --avionics-button: 210 12% 82%;
+    --avionics-button-hover: 210 12% 76%;
+    --avionics-button-active: 210 12% 85%;
+    --avionics-divider: 210 12% 74%;
+    --avionics-label: 220 10% 45%;
+    --avionics-inset: 210 15% 95%;
+
+    --sidebar-background: 210 15% 94%;
+    --sidebar-foreground: 220 20% 12%;
+    --sidebar-primary: 160 100% 32%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 12% 85%;
+    --sidebar-accent-foreground: 220 20% 12%;
+    --sidebar-border: 210 12% 78%;
+    --sidebar-ring: 160 100% 32%;
+  }
 }
 
 @layer base {
