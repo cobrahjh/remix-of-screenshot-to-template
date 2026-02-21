@@ -165,7 +165,7 @@ const GtnDisplay = () => {
                 <button
                   key={tab.page}
                   onClick={() => navigateTo(tab.page)}
-                  className={`px-1.5 py-[3px] text-[8px] font-mono whitespace-nowrap transition-colors ${
+                  className={`px-1.5 py-[3px] text-[11px] font-mono whitespace-nowrap transition-colors ${
                     currentPage === tab.page
                       ? "text-avionics-cyan bg-avionics-button border-b border-avionics-cyan"
                       : "text-avionics-label hover:text-avionics-white"
@@ -191,7 +191,7 @@ const GtnDisplay = () => {
                 <button
                   key={tab.page}
                   onClick={() => navigateTo(tab.page)}
-                  className={`px-1.5 py-[3px] text-[8px] font-mono whitespace-nowrap transition-colors ${
+                  className={`px-1.5 py-[3px] text-[11px] font-mono whitespace-nowrap transition-colors ${
                     currentPage === tab.page
                       ? "text-avionics-cyan bg-avionics-button border-b border-avionics-cyan"
                       : "text-avionics-label hover:text-avionics-white"
