@@ -173,7 +173,7 @@ async function fetchSimBrief(pilotId: string): Promise<SimBriefResult | null> {
 
 /* ─── Import Dialog ─── */
 const ImportDialog = ({ onImport, onClose }: { onImport: (plan: FlightPlanWaypoint[], aircraftId?: string | null) => void; onClose: () => void }) => {
-  const [tab, setTab] = useState<"file" | "text" | "simbrief">("file");
+  const [tab, setTab] = useState<"file" | "text" | "simbrief">("simbrief");
   const [textInput, setTextInput] = useState("");
   const [simbriefId, setSimbriefId] = useState(() => localStorage.getItem("simbrief_pilot_id") || "");
   const [loading, setLoading] = useState(false);
@@ -275,9 +275,9 @@ const ImportDialog = ({ onImport, onClose }: { onImport: (plan: FlightPlanWaypoi
 
       {/* Tab bar */}
       <div className="flex border-b border-avionics-divider">
+        <button onClick={() => { setTab("simbrief"); setError(null); setPreview(null); }} className={tabClass("simbrief")}>SIMBRIEF</button>
         <button onClick={() => { setTab("file"); setError(null); setPreview(null); }} className={tabClass("file")}>FILE</button>
         <button onClick={() => { setTab("text"); setError(null); setPreview(null); }} className={tabClass("text")}>TEXT</button>
-        <button onClick={() => { setTab("simbrief"); setError(null); setPreview(null); }} className={tabClass("simbrief")}>SIMBRIEF</button>
       </div>
 
       {/* Content */}
