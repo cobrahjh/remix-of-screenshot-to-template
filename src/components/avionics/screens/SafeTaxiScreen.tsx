@@ -19,6 +19,16 @@ interface TaxiwayData {
   points: string; // SVG polyline points
 }
 
+interface HoldShortData {
+  id: string; // e.g. "HS-A/10R28L"
+  x: number;
+  y: number;
+  angle: number; // perpendicular to runway, degrees
+  length: number; // px width of marking
+  runway: string; // runway it protects
+  taxiway: string; // taxiway it's on
+}
+
 interface AirportData {
   icao: string;
   name: string;
@@ -27,6 +37,7 @@ interface AirportData {
   atisFreq: string;
   runways: RunwayData[];
   taxiways: TaxiwayData[];
+  holdShorts: HoldShortData[];
   ramp: { points: string; label: string }[];
   buildings: { x: number; y: number; w: number; h: number; label?: string }[];
   beacon: { x: number; y: number };
@@ -78,6 +89,14 @@ const AIRPORTS: Record<string, AirportData> = {
       { x: 70, y: 275, w: 40, h: 15, label: "FBO" },
     ],
     beacon: { x: 350, y: 130 },
+    holdShorts: [
+      { id: "HS-B/10R28L", x: 140, y: 165, angle: 100, length: 16, runway: "10R/28L", taxiway: "B" },
+      { id: "HS-C/10R28L", x: 200, y: 165, angle: 100, length: 16, runway: "10R/28L", taxiway: "C" },
+      { id: "HS-D/10R28L", x: 260, y: 165, angle: 100, length: 16, runway: "10R/28L", taxiway: "D" },
+      { id: "HS-B/10L28R", x: 140, y: 195, angle: 100, length: 12, runway: "10L/28R", taxiway: "B" },
+      { id: "HS-C/10L28R", x: 200, y: 195, angle: 100, length: 12, runway: "10L/28R", taxiway: "C" },
+      { id: "HS-D/10L28R", x: 260, y: 195, angle: 100, length: 12, runway: "10L/28R", taxiway: "D" },
+    ],
   },
   KSNS: {
     icao: "KSNS",
@@ -119,6 +138,11 @@ const AIRPORTS: Record<string, AirportData> = {
       { x: 90, y: 265, w: 45, h: 20, label: "FBO" },
     ],
     beacon: { x: 340, y: 120 },
+    holdShorts: [
+      { id: "HS-B/826", x: 170, y: 155, angle: 80, length: 14, runway: "8/26", taxiway: "B" },
+      { id: "HS-C/826", x: 250, y: 155, angle: 80, length: 14, runway: "8/26", taxiway: "C" },
+      { id: "HS-D/1432", x: 140, y: 205, angle: 140, length: 12, runway: "14/32", taxiway: "D" },
+    ],
   },
   KSJC: {
     icao: "KSJC",
@@ -166,6 +190,12 @@ const AIRPORTS: Record<string, AirportData> = {
       { x: 60, y: 285, w: 40, h: 15, label: "FBO" },
     ],
     beacon: { x: 360, y: 130 },
+    holdShorts: [
+      { id: "HS-B/12L30R", x: 80, y: 165, angle: 120, length: 16, runway: "12L/30R", taxiway: "B" },
+      { id: "HS-C/12L30R", x: 150, y: 165, angle: 120, length: 16, runway: "12L/30R", taxiway: "C" },
+      { id: "HS-D/12R30L", x: 210, y: 195, angle: 120, length: 16, runway: "12R/30L", taxiway: "D" },
+      { id: "HS-E/12R30L", x: 270, y: 195, angle: 120, length: 16, runway: "12R/30L", taxiway: "E" },
+    ],
   },
   KSFO: {
     icao: "KSFO",
@@ -232,6 +262,14 @@ const AIRPORTS: Record<string, AirportData> = {
       { x: 200, y: 240, w: 50, h: 18, label: "TERMINAL 3" },
     ],
     beacon: { x: 380, y: 100 },
+    holdShorts: [
+      { id: "HS-B/28L10R", x: 80, y: 125, angle: 100, length: 16, runway: "28L/10R", taxiway: "B" },
+      { id: "HS-C/28L10R", x: 160, y: 125, angle: 100, length: 16, runway: "28L/10R", taxiway: "C" },
+      { id: "HS-D/28R10L", x: 240, y: 165, angle: 100, length: 16, runway: "28R/10L", taxiway: "D" },
+      { id: "HS-E/28R10L", x: 320, y: 165, angle: 100, length: 16, runway: "28R/10L", taxiway: "E" },
+      { id: "HS-F/01L19R", x: 280, y: 215, angle: 10, length: 14, runway: "01L/19R", taxiway: "F" },
+      { id: "HS-E/01R19L", x: 320, y: 215, angle: 10, length: 14, runway: "01R/19L", taxiway: "E" },
+    ],
   },
   KOAK: {
     icao: "KOAK",
@@ -288,6 +326,13 @@ const AIRPORTS: Record<string, AirportData> = {
       { x: 55, y: 280, w: 50, h: 15, label: "FBO" },
     ],
     beacon: { x: 380, y: 130 },
+    holdShorts: [
+      { id: "HS-B/1230", x: 100, y: 165, angle: 120, length: 16, runway: "12/30", taxiway: "B" },
+      { id: "HS-C/1230", x: 180, y: 165, angle: 120, length: 16, runway: "12/30", taxiway: "C" },
+      { id: "HS-D/1230", x: 240, y: 165, angle: 120, length: 16, runway: "12/30", taxiway: "D" },
+      { id: "HS-C/10L28R", x: 180, y: 215, angle: 100, length: 14, runway: "10L/28R", taxiway: "C" },
+      { id: "HS-W/10R28L", x: 100, y: 255, angle: 100, length: 14, runway: "10R/28L", taxiway: "W" },
+    ],
   },
   KLAX: {
     icao: "KLAX",
@@ -355,6 +400,14 @@ const AIRPORTS: Record<string, AirportData> = {
       { x: 150, y: 345, w: 100, h: 18, label: "TOM BRADLEY INTL" },
     ],
     beacon: { x: 400, y: 80 },
+    holdShorts: [
+      { id: "HS-E/6L24R", x: 120, y: 105, angle: 70, length: 16, runway: "6L/24R", taxiway: "E" },
+      { id: "HS-T/6R24L", x: 200, y: 140, angle: 70, length: 16, runway: "6R/24L", taxiway: "T" },
+      { id: "HS-B/6R24L", x: 280, y: 140, angle: 70, length: 16, runway: "6R/24L", taxiway: "B" },
+      { id: "HS-C/7L25R", x: 130, y: 235, angle: 70, length: 16, runway: "7L/25R", taxiway: "C" },
+      { id: "HS-K/7L25R", x: 230, y: 235, angle: 70, length: 16, runway: "7L/25R", taxiway: "K" },
+      { id: "HS-P/7R25L", x: 300, y: 280, angle: 70, length: 16, runway: "7R/25L", taxiway: "P" },
+    ],
   },
   KSAN: {
     icao: "KSAN",
@@ -392,6 +445,12 @@ const AIRPORTS: Record<string, AirportData> = {
       { x: 290, y: 245, w: 50, h: 14, label: "COMMUTER" },
     ],
     beacon: { x: 390, y: 130 },
+    holdShorts: [
+      { id: "HS-B/927", x: 120, y: 165, angle: 90, length: 18, runway: "9/27", taxiway: "B" },
+      { id: "HS-C/927", x: 200, y: 165, angle: 90, length: 18, runway: "9/27", taxiway: "C" },
+      { id: "HS-E/927", x: 280, y: 165, angle: 90, length: 18, runway: "9/27", taxiway: "E" },
+      { id: "HS-F/927", x: 330, y: 165, angle: 90, length: 18, runway: "9/27", taxiway: "F" },
+    ],
   },
   KBUR: {
     icao: "KBUR",
@@ -437,6 +496,12 @@ const AIRPORTS: Record<string, AirportData> = {
       { x: 65, y: 245, w: 60, h: 14, label: "ATLANTIC FBO" },
     ],
     beacon: { x: 360, y: 110 },
+    holdShorts: [
+      { id: "HS-B/826", x: 120, y: 145, angle: 80, length: 16, runway: "8/26", taxiway: "B" },
+      { id: "HS-C/826", x: 200, y: 145, angle: 80, length: 16, runway: "8/26", taxiway: "C" },
+      { id: "HS-D/826", x: 260, y: 145, angle: 80, length: 16, runway: "8/26", taxiway: "D" },
+      { id: "HS-G/1533", x: 310, y: 185, angle: 150, length: 12, runway: "15/33", taxiway: "G" },
+    ],
   },
   KONT: {
     icao: "KONT",
@@ -487,6 +552,14 @@ const AIRPORTS: Record<string, AirportData> = {
       { x: 330, y: 215, w: 40, h: 14, label: "FED EX" },
     ],
     beacon: { x: 395, y: 100 },
+    holdShorts: [
+      { id: "HS-C/8L26R", x: 120, y: 135, angle: 80, length: 16, runway: "8L/26R", taxiway: "C" },
+      { id: "HS-D/8L26R", x: 200, y: 135, angle: 80, length: 16, runway: "8L/26R", taxiway: "D" },
+      { id: "HS-E/8L26R", x: 280, y: 135, angle: 80, length: 16, runway: "8L/26R", taxiway: "E" },
+      { id: "HS-F/8L26R", x: 340, y: 135, angle: 80, length: 16, runway: "8L/26R", taxiway: "F" },
+      { id: "HS-H/8R26L", x: 140, y: 255, angle: 80, length: 16, runway: "8R/26L", taxiway: "H" },
+      { id: "HS-K/8R26L", x: 320, y: 255, angle: 80, length: 16, runway: "8R/26L", taxiway: "K" },
+    ],
   },
 };
 
@@ -1068,6 +1141,20 @@ export const SafeTaxiScreen = () => {
   const ownshipX = 200;
   const ownshipY = 240;
 
+  // Hold short proximity alerts
+  const HOLD_SHORT_ALERT_DISTANCE = 30; // px proximity threshold
+  const HOLD_SHORT_WARN_DISTANCE = 50;
+  const holdShortAlerts = useMemo(() => {
+    return airport.holdShorts.map(hs => {
+      const dx = ownshipX - hs.x;
+      const dy = ownshipY - hs.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const alert = dist < HOLD_SHORT_ALERT_DISTANCE;
+      const warn = dist < HOLD_SHORT_WARN_DISTANCE && !alert;
+      return { ...hs, dist, alert, warn };
+    }).filter(hs => hs.alert || hs.warn);
+  }, [airport.holdShorts, ownshipX, ownshipY]);
+
   return (
     <div className="flex-1 flex flex-col bg-avionics-panel-dark overflow-hidden">
       {/* Header */}
@@ -1166,6 +1253,35 @@ export const SafeTaxiScreen = () => {
           <span className="font-mono text-[9px] text-purple-200 font-bold">{activeTaxiRoute.runway}</span>
           <span className="font-mono text-[8px] text-purple-400">VIA</span>
           <span className="font-mono text-[9px] text-purple-200">{activeTaxiRoute.taxiways.join(" · ")}</span>
+        </div>
+      )}
+
+      {/* Hold short alerts */}
+      {holdShortAlerts.length > 0 && (
+        <div className={`flex items-center gap-2 px-3 py-1.5 border-b ${
+          holdShortAlerts.some(h => h.alert)
+            ? "border-red-500/60 bg-red-950/60"
+            : "border-yellow-500/40 bg-yellow-950/30"
+        }`}>
+          <AlertTriangle className={`w-4 h-4 shrink-0 ${
+            holdShortAlerts.some(h => h.alert) ? "text-red-400" : "text-yellow-400"
+          }`} />
+          <div className="flex-1 flex flex-col gap-0.5">
+            <span className={`font-mono text-[9px] font-bold ${
+              holdShortAlerts.some(h => h.alert) ? "text-red-300" : "text-yellow-300"
+            }`}>
+              {holdShortAlerts.some(h => h.alert)
+                ? "⛔ HOLD SHORT — RUNWAY AHEAD"
+                : "⚠ APPROACHING HOLD SHORT LINE"}
+            </span>
+            <div className="flex items-center gap-3 flex-wrap">
+              {holdShortAlerts.map(h => (
+                <span key={h.id} className={`font-mono text-[8px] ${h.alert ? "text-red-200" : "text-yellow-200"}`}>
+                  TWY {h.taxiway} / RWY {h.runway}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -1396,6 +1512,56 @@ export const SafeTaxiScreen = () => {
           {airport.runways.map((rw, i) => (
             <RunwaySvg key={rw.id} runway={rw} index={i} />
           ))}
+
+          {/* Hold short markings */}
+          {airport.holdShorts.map(hs => {
+            const alertInfo = holdShortAlerts.find(a => a.id === hs.id);
+            const isAlert = alertInfo?.alert;
+            const isWarn = alertInfo?.warn;
+            const rad = (hs.angle - 90) * (Math.PI / 180);
+            const perpRad = rad + Math.PI / 2;
+            const halfLen = hs.length / 2;
+            // Two parallel dashed lines (hold short marking pattern)
+            const offset = 2;
+            const x1a = hs.x - halfLen * Math.cos(perpRad) + offset * Math.cos(rad);
+            const y1a = hs.y - halfLen * Math.sin(perpRad) + offset * Math.sin(rad);
+            const x2a = hs.x + halfLen * Math.cos(perpRad) + offset * Math.cos(rad);
+            const y2a = hs.y + halfLen * Math.sin(perpRad) + offset * Math.sin(rad);
+            const x1b = hs.x - halfLen * Math.cos(perpRad) - offset * Math.cos(rad);
+            const y1b = hs.y - halfLen * Math.sin(perpRad) - offset * Math.sin(rad);
+            const x2b = hs.x + halfLen * Math.cos(perpRad) - offset * Math.cos(rad);
+            const y2b = hs.y + halfLen * Math.sin(perpRad) - offset * Math.sin(rad);
+            const strokeColor = isAlert ? "hsl(0 100% 60%)" : isWarn ? "hsl(45 100% 55%)" : "hsl(45 80% 45%)";
+            return (
+              <g key={hs.id}>
+                {/* Glow for alerts */}
+                {(isAlert || isWarn) && (
+                  <circle cx={hs.x} cy={hs.y} r={isAlert ? 12 : 8} fill="none"
+                    stroke={isAlert ? "hsl(0 100% 50%)" : "hsl(45 100% 50%)"} strokeWidth={1.5} opacity={0.4}>
+                    <animate attributeName="r" values={isAlert ? "8;14;8" : "6;10;6"} dur={isAlert ? "0.8s" : "1.2s"} repeatCount="indefinite" />
+                    <animate attributeName="opacity" values="0.5;0.15;0.5" dur={isAlert ? "0.8s" : "1.2s"} repeatCount="indefinite" />
+                  </circle>
+                )}
+                {/* Solid line */}
+                <line x1={x1a} y1={y1a} x2={x2a} y2={y2a}
+                  stroke={strokeColor} strokeWidth={isAlert ? 2 : 1.5} opacity={isAlert || isWarn ? 1 : 0.6}>
+                  {isAlert && <animate attributeName="opacity" values="1;0.3;1" dur="0.6s" repeatCount="indefinite" />}
+                </line>
+                {/* Dashed line */}
+                <line x1={x1b} y1={y1b} x2={x2b} y2={y2b}
+                  stroke={strokeColor} strokeWidth={isAlert ? 2 : 1.5} strokeDasharray="3 2" opacity={isAlert || isWarn ? 1 : 0.6}>
+                  {isAlert && <animate attributeName="opacity" values="1;0.3;1" dur="0.6s" repeatCount="indefinite" />}
+                </line>
+                {/* Label for nearby hold shorts */}
+                {(isAlert || isWarn) && (
+                  <text x={hs.x} y={hs.y - 14} fill={isAlert ? "hsl(0 100% 70%)" : "hsl(45 100% 65%)"} fontSize="6" fontFamily="Share Tech Mono" textAnchor="middle" fontWeight="bold">
+                    {isAlert && <animate attributeName="opacity" values="1;0.3;1" dur="0.6s" repeatCount="indefinite" />}
+                    HS {hs.taxiway}/{hs.runway}
+                  </text>
+                )}
+              </g>
+            );
+          })}
 
           {/* Buildings */}
           {airport.buildings.map((b, i) => (
