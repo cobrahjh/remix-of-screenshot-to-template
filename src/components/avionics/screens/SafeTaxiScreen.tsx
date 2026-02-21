@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { useFlightData } from "../FlightDataContext";
-import { PlaneTakeoff, AlertTriangle, ChevronDown, ChevronUp, Wind, Radio, Navigation, ShieldAlert, Plane, Droplets, Snowflake, CloudSnow } from "lucide-react";
+import { PlaneTakeoff, AlertTriangle, ChevronDown, ChevronUp, Wind, Radio, Navigation, ShieldAlert, Plane, Droplets, Snowflake, CloudSnow, Gauge } from "lucide-react";
 
 interface RunwayData {
   id: string;
@@ -1295,6 +1295,75 @@ export const SafeTaxiScreen = () => {
           <span className="font-mono text-[9px] text-purple-200">{activeTaxiRoute.taxiways.join(" · ")}</span>
         </div>
       )}
+
+      {/* Ground speed taxi readout */}
+      {(() => {
+        const gs = flight.groundSpeed;
+        const RAMP_LIMIT = 5;
+        const TAXIWAY_LIMIT = 25;
+        const TAXI_CAUTION = 15;
+        const isMoving = gs > 0.5;
+        const rampExceeded = gs > RAMP_LIMIT;
+        const taxiCaution = gs > TAXI_CAUTION && gs <= TAXIWAY_LIMIT;
+        const taxiExceeded = gs > TAXIWAY_LIMIT;
+        const barPct = Math.min(100, (gs / 35) * 100);
+
+        if (!isMoving) return null;
+
+        return (
+          <div className={`flex items-center gap-2 px-3 py-1 border-b ${
+            taxiExceeded
+              ? "border-red-500/60 bg-red-950/50"
+              : taxiCaution
+              ? "border-yellow-500/40 bg-yellow-950/30"
+              : "border-avionics-divider bg-avionics-panel"
+          }`}>
+            <Gauge className={`w-3.5 h-3.5 shrink-0 ${
+              taxiExceeded ? "text-red-400" : taxiCaution ? "text-yellow-400" : "text-avionics-green"
+            }`} />
+            <div className="flex items-center gap-2 flex-1">
+              <span className="font-mono text-[8px] text-avionics-label shrink-0">GS</span>
+              <span className={`font-mono text-[12px] font-bold tabular-nums w-[28px] text-right shrink-0 ${
+                taxiExceeded ? "text-red-300" : taxiCaution ? "text-yellow-300" : "text-avionics-green"
+              }`}>
+                {Math.round(gs)}
+              </span>
+              <span className="font-mono text-[7px] text-avionics-label shrink-0">KT</span>
+              {/* Speed bar */}
+              <div className="flex-1 h-[6px] bg-avionics-inset rounded-sm overflow-hidden relative mx-1">
+                {/* Ramp zone */}
+                <div className="absolute left-0 top-0 h-full bg-avionics-green/15" style={{ width: `${(RAMP_LIMIT / 35) * 100}%` }} />
+                {/* Taxiway zone */}
+                <div className="absolute top-0 h-full bg-yellow-500/10" style={{ left: `${(RAMP_LIMIT / 35) * 100}%`, width: `${((TAXIWAY_LIMIT - RAMP_LIMIT) / 35) * 100}%` }} />
+                {/* Over-limit zone */}
+                <div className="absolute top-0 right-0 h-full bg-red-500/15" style={{ width: `${((35 - TAXIWAY_LIMIT) / 35) * 100}%` }} />
+                {/* Caution marker */}
+                <div className="absolute top-0 h-full w-px bg-yellow-500/50" style={{ left: `${(TAXI_CAUTION / 35) * 100}%` }} />
+                {/* Limit marker */}
+                <div className="absolute top-0 h-full w-px bg-red-500/60" style={{ left: `${(TAXIWAY_LIMIT / 35) * 100}%` }} />
+                {/* Speed indicator */}
+                <div
+                  className={`absolute top-0 h-full rounded-sm transition-all duration-300 ${
+                    taxiExceeded ? "bg-red-500" : taxiCaution ? "bg-yellow-500" : "bg-avionics-green"
+                  }`}
+                  style={{ width: `${barPct}%` }}
+                />
+              </div>
+              {/* Speed zone label */}
+              <span className={`font-mono text-[7px] shrink-0 ${
+                taxiExceeded ? "text-red-300 font-bold" : taxiCaution ? "text-yellow-300" : "text-avionics-label"
+              }`}>
+                {taxiExceeded ? "⚠ SPEED" : gs <= RAMP_LIMIT ? "RAMP" : taxiCaution ? "FAST" : "TAXI"}
+              </span>
+            </div>
+            {taxiExceeded && (
+              <span className="font-mono text-[8px] text-red-300 font-bold animate-pulse shrink-0">
+                REDUCE SPEED
+              </span>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Hold short alerts */}
       {holdShortAlerts.length > 0 && (
