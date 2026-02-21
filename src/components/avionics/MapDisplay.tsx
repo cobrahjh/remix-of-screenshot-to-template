@@ -299,12 +299,15 @@ export const MapDisplay = () => {
     const map = L.map(mapRef.current, {
       center: [flight.lat, flight.lng],
       zoom: 7,
+      minZoom: 3,
       zoomControl: false,
       attributionControl: false,
+      maxBoundsViscosity: 1.0,
     });
 
     L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
       maxZoom: 19,
+      noWrap: false,
     }).addTo(map);
 
     // Flight plan route polyline (magenta)
