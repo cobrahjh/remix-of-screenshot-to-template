@@ -50,6 +50,7 @@ interface GtnState {
   audio: AudioState;
   flightPlan: FlightPlanWaypoint[];
   activeWaypointIndex: number;
+  selectedAircraft: string;
   smartGlideActive: boolean;
   emergencyDescentActive: boolean;
   directToTarget: string | null;
@@ -75,6 +76,7 @@ interface GtnContextValue extends GtnState {
   toggleEmergencyDescent: () => void;
   setActiveWaypoint: (index: number) => void;
   setFlightPlan: (plan: FlightPlanWaypoint[]) => void;
+  setSelectedAircraft: (id: string) => void;
   toggleObs: () => void;
   setObsCourse: (course: number) => void;
   mapZoomIn: () => void;
@@ -128,6 +130,7 @@ export const GtnProvider = ({ children }: { children: React.ReactNode }) => {
     },
     flightPlan: defaultFlightPlan,
     activeWaypointIndex: 2,
+    selectedAircraft: "c172",
     smartGlideActive: false,
     emergencyDescentActive: false,
     directToTarget: null,
@@ -218,6 +221,10 @@ export const GtnProvider = ({ children }: { children: React.ReactNode }) => {
     }));
   }, []);
 
+  const setSelectedAircraft = useCallback((id: string) => {
+    setState(s => ({ ...s, selectedAircraft: id }));
+  }, []);
+
   const toggleObs = useCallback(() => {
     setState(s => ({ ...s, obsMode: !s.obsMode }));
   }, []);
@@ -241,7 +248,7 @@ export const GtnProvider = ({ children }: { children: React.ReactNode }) => {
       toggleComPanel, toggleAudioPanel, toggleXpdrPanel,
       setXpdrMode, setXpdrCode, toggleAudioSetting,
       activateDirectTo, cancelDirectTo, toggleSmartGlide, toggleEmergencyDescent,
-      setActiveWaypoint, setFlightPlan, toggleObs, setObsCourse,
+      setActiveWaypoint, setFlightPlan, setSelectedAircraft, toggleObs, setObsCourse,
       mapZoomIn, mapZoomOut, registerMapZoom,
     }}>
       {children}

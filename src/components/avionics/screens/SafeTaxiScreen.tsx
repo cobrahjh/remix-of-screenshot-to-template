@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { useFlightData } from "../FlightDataContext";
+import { useGtn } from "../GtnContext";
 import { PlaneTakeoff, AlertTriangle, ChevronDown, ChevronUp, Wind, Radio, Navigation, ShieldAlert, Plane, Droplets, Snowflake, CloudSnow, Gauge } from "lucide-react";
 
 interface RunwayData {
@@ -1088,7 +1089,7 @@ export const SafeTaxiScreen = () => {
   const [atisOpen, setAtisOpen] = useState(false);
   const [showTaxiRoute, setShowTaxiRoute] = useState(true);
   const [xwindDismissed, setXwindDismissed] = useState(false);
-  const [selectedAircraft, setSelectedAircraft] = useState<string>("c172");
+  const { selectedAircraft, setSelectedAircraft } = useGtn();
   const [showAircraftPicker, setShowAircraftPicker] = useState(false);
 
   const [runwayContamination, setRunwayContamination] = useState<Record<string, ContaminationType>>({});
