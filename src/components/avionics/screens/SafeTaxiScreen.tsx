@@ -875,17 +875,23 @@ const ATIS_DATA: Record<string, AtisData> = {
   },
 };
 
+// Compute headwind and crosswind components for a given runway heading
+const getWindComponents = (windDir: number, windSpeed: number, rwyHdg: number) => {
+  const angleDiff = ((windDir - rwyHdg) * Math.PI) / 180;
+  const headwind = Math.round(windSpeed * Math.cos(angleDiff));
+  const crosswind = Math.round(Math.abs(windSpeed * Math.sin(angleDiff)));
+  const crossDir = windSpeed * Math.sin(angleDiff);
+  return { headwind, crosswind, crossDir }; // crossDir > 0 = from right, < 0 = from left
+};
+
 // Determine which runway heading is preferred given wind direction
 const getPreferredRunways = (runways: RunwayData[], windDir: number): Set<string> => {
   const preferred = new Set<string>();
   for (const rw of runways) {
-    // Each runway has two headings; compute which end has better headwind
     const hdg0 = parseInt(rw.headings[0].replace(/[LRC]/g, "")) * 10;
     const hdg1 = parseInt(rw.headings[1].replace(/[LRC]/g, "")) * 10;
-    // Headwind component: cos of angle between wind FROM direction and runway heading
     const hw0 = Math.cos(((windDir - hdg0) * Math.PI) / 180);
     const hw1 = Math.cos(((windDir - hdg1) * Math.PI) / 180);
-    // The end with greater headwind component is preferred
     if (hw0 >= hw1) {
       preferred.add(rw.headings[0]);
     } else {
@@ -1246,12 +1252,19 @@ export const SafeTaxiScreen = () => {
         </svg>
       </div>
 
-      {/* Runway info strip with preferred runway highlighting */}
+      {/* Runway info strip with crosswind components */}
       <div className="border-t border-avionics-divider bg-avionics-panel px-3 py-1.5">
-        <div className="flex items-center gap-3 overflow-x-auto">
+        <div className="flex items-center gap-4 overflow-x-auto">
           {airport.runways.map((rw) => {
             const pref0 = preferredRunways.has(rw.headings[0]);
             const pref1 = preferredRunways.has(rw.headings[1]);
+            const hdg0 = parseInt(rw.headings[0].replace(/[LRC]/g, "")) * 10;
+            const hdg1 = parseInt(rw.headings[1].replace(/[LRC]/g, "")) * 10;
+            const wc0 = getWindComponents(wind.direction, wind.speed, hdg0);
+            const wc1 = getWindComponents(wind.direction, wind.speed, hdg1);
+            // Show components for the preferred end
+            const activeHdg = pref0 ? 0 : 1;
+            const wc = activeHdg === 0 ? wc0 : wc1;
             return (
               <div key={rw.id} className="flex items-center gap-1.5 shrink-0">
                 <span className={`font-mono text-[9px] ${pref0 ? "text-avionics-green" : "text-avionics-label"}`}>
@@ -1264,6 +1277,13 @@ export const SafeTaxiScreen = () => {
                   {rw.headings[1]}
                 </span>
                 <span className="font-mono text-[7px] text-avionics-label">{rw.surface.toUpperCase()}</span>
+                <span className="font-mono text-[7px] text-avionics-label">│</span>
+                <span className={`font-mono text-[7px] ${wc.headwind >= 0 ? "text-avionics-green" : "text-avionics-amber"}`}>
+                  {wc.headwind >= 0 ? "H" : "T"}{Math.abs(wc.headwind)}
+                </span>
+                <span className={`font-mono text-[7px] ${wc.crosswind > 15 ? "text-avionics-red" : wc.crosswind > 10 ? "text-avionics-amber" : "text-avionics-cyan"}`}>
+                  X{wc.crosswind}{wc.crossDir > 0.5 ? "R" : wc.crossDir < -0.5 ? "L" : ""}
+                </span>
               </div>
             );
           })}
