@@ -105,7 +105,7 @@ const defaultFlightPlan: FlightPlanWaypoint[] = [
 
 export const GtnProvider = ({ children }: { children: React.ReactNode }) => {
   const [state, setState] = useState<GtnState>({
-    currentPage: "map",
+    currentPage: "home",
     previousPage: null,
     com: {
       activeFreq: "133.00",
