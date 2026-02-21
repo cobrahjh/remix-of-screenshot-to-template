@@ -694,7 +694,7 @@ export const MapDisplay = () => {
       <div ref={mapRef} className="absolute inset-0" />
 
       {/* Connection status overlay */}
-      <div className="absolute top-2 left-2 z-[1000] flex items-center gap-1.5">
+      <div className="absolute top-2 left-2 z-[1000] flex items-center gap-1.5" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
         <div className={`w-1.5 h-1.5 rounded-full ${isLive ? "bg-avionics-green animate-pulse" : "bg-avionics-divider"}`} />
         <span className="font-mono text-[9px] text-avionics-label bg-avionics-panel-dark/80 px-1.5 py-0.5 rounded">
           {connectionMode === "test" ? "TEST" : connectionMode === "flowpro" ? "FLOW PRO" : connectionMode === "websocket" ? "WS BRIDGE" : "STATIC"}
@@ -702,7 +702,7 @@ export const MapDisplay = () => {
       </div>
 
       {/* Map overlay toggles */}
-      <div className="absolute top-2 right-2 z-[1000] flex flex-col items-end gap-1">
+      <div className="absolute top-2 right-2 z-[1000] flex flex-col items-end gap-1" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
         <div className="flex gap-1">
           <button
             onClick={() => setNexradOn(!nexradOn)}
@@ -833,7 +833,7 @@ export const MapDisplay = () => {
       </div>
 
       {/* Range indicator */}
-      <div className="absolute bottom-2 left-2 z-[1000] font-mono text-[9px] text-avionics-label bg-avionics-panel-dark/80 px-1.5 py-0.5 rounded">
+      <div className="absolute bottom-2 left-2 z-[1000] font-mono text-[9px] text-avionics-label bg-avionics-panel-dark/80 px-1.5 py-0.5 rounded" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
         20 NM
       </div>
     </div>
