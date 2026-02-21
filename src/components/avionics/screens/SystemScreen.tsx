@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useFlightData, ConnectionMode } from "../FlightDataContext";
-import { Wifi, WifiOff, TestTube2, Check } from "lucide-react";
+import { Wifi, WifiOff, TestTube2, Check, Save, Trash2, PenLine, Plus } from "lucide-react";
 
 type Tab = "conn" | "setup" | "gps" | "units" | "database" | "backlight";
 
@@ -296,101 +296,254 @@ const ConnectionTab = () => {
 interface ColorScheme {
   id: string;
   name: string;
-  preview: { primary: string; accent: string; bg: string; text: string };
+  builtin?: boolean;
   vars: Record<string, string>;
 }
 
-const COLOR_SCHEMES: ColorScheme[] = [
+const VAR_LABELS: { key: string; label: string }[] = [
+  { key: "--avionics-green", label: "Primary" },
+  { key: "--avionics-cyan", label: "Accent" },
+  { key: "--avionics-magenta", label: "Highlight" },
+  { key: "--avionics-amber", label: "Warning" },
+];
+
+const BUILTIN_SCHEMES: ColorScheme[] = [
   {
-    id: "default",
-    name: "Standard",
-    preview: { primary: "hsl(160,100%,45%)", accent: "hsl(185,100%,55%)", bg: "hsl(220,20%,8%)", text: "hsl(0,0%,92%)" },
-    vars: {
-      "--avionics-green": "160 100% 45%",
-      "--avionics-cyan": "185 100% 55%",
-      "--avionics-magenta": "300 80% 60%",
-      "--avionics-amber": "40 100% 55%",
-    },
+    id: "default", name: "Standard", builtin: true,
+    vars: { "--avionics-green": "160 100% 45%", "--avionics-cyan": "185 100% 55%", "--avionics-magenta": "300 80% 60%", "--avionics-amber": "40 100% 55%" },
   },
   {
-    id: "neon",
-    name: "Neon",
-    preview: { primary: "hsl(130,100%,50%)", accent: "hsl(170,100%,50%)", bg: "hsl(220,20%,8%)", text: "hsl(0,0%,92%)" },
-    vars: {
-      "--avionics-green": "130 100% 50%",
-      "--avionics-cyan": "170 100% 50%",
-      "--avionics-magenta": "320 100% 60%",
-      "--avionics-amber": "50 100% 55%",
-    },
+    id: "neon", name: "Neon", builtin: true,
+    vars: { "--avionics-green": "130 100% 50%", "--avionics-cyan": "170 100% 50%", "--avionics-magenta": "320 100% 60%", "--avionics-amber": "50 100% 55%" },
   },
   {
-    id: "military",
-    name: "Military",
-    preview: { primary: "hsl(120,60%,40%)", accent: "hsl(80,50%,45%)", bg: "hsl(220,20%,8%)", text: "hsl(0,0%,92%)" },
-    vars: {
-      "--avionics-green": "120 60% 40%",
-      "--avionics-cyan": "80 50% 45%",
-      "--avionics-magenta": "45 80% 50%",
-      "--avionics-amber": "30 80% 45%",
-    },
+    id: "military", name: "Military", builtin: true,
+    vars: { "--avionics-green": "120 60% 40%", "--avionics-cyan": "80 50% 45%", "--avionics-magenta": "45 80% 50%", "--avionics-amber": "30 80% 45%" },
   },
   {
-    id: "ocean",
-    name: "Ocean",
-    preview: { primary: "hsl(200,90%,50%)", accent: "hsl(175,80%,50%)", bg: "hsl(220,20%,8%)", text: "hsl(0,0%,92%)" },
-    vars: {
-      "--avionics-green": "175 80% 50%",
-      "--avionics-cyan": "200 90% 50%",
-      "--avionics-magenta": "260 70% 60%",
-      "--avionics-amber": "35 90% 55%",
-    },
+    id: "ocean", name: "Ocean", builtin: true,
+    vars: { "--avionics-green": "175 80% 50%", "--avionics-cyan": "200 90% 50%", "--avionics-magenta": "260 70% 60%", "--avionics-amber": "35 90% 55%" },
   },
   {
-    id: "sunset",
-    name: "Sunset",
-    preview: { primary: "hsl(30,100%,55%)", accent: "hsl(350,80%,55%)", bg: "hsl(220,20%,8%)", text: "hsl(0,0%,92%)" },
-    vars: {
-      "--avionics-green": "30 100% 55%",
-      "--avionics-cyan": "350 80% 55%",
-      "--avionics-magenta": "280 70% 55%",
-      "--avionics-amber": "50 100% 50%",
-    },
+    id: "sunset", name: "Sunset", builtin: true,
+    vars: { "--avionics-green": "30 100% 55%", "--avionics-cyan": "350 80% 55%", "--avionics-magenta": "280 70% 55%", "--avionics-amber": "50 100% 50%" },
   },
   {
-    id: "arctic",
-    name: "Arctic",
-    preview: { primary: "hsl(210,60%,70%)", accent: "hsl(190,50%,65%)", bg: "hsl(220,20%,8%)", text: "hsl(0,0%,92%)" },
-    vars: {
-      "--avionics-green": "210 60% 70%",
-      "--avionics-cyan": "190 50% 65%",
-      "--avionics-magenta": "240 50% 70%",
-      "--avionics-amber": "45 70% 65%",
-    },
+    id: "arctic", name: "Arctic", builtin: true,
+    vars: { "--avionics-green": "210 60% 70%", "--avionics-cyan": "190 50% 65%", "--avionics-magenta": "240 50% 70%", "--avionics-amber": "45 70% 65%" },
   },
 ];
 
+function parseHsl(hslStr: string): [number, number, number] {
+  const parts = hslStr.split(/\s+/);
+  return [
+    parseInt(parts[0]) || 0,
+    parseInt(parts[1]) || 100,
+    parseInt(parts[2]) || 50,
+  ];
+}
+
+function toHslStr(h: number, s: number, l: number) {
+  return `${h} ${s}% ${l}%`;
+}
+
+function hslToCss(hslStr: string) {
+  return `hsl(${hslStr.replace(/\s+/g, ", ").replace("%, %", "% , ")})`.replace(/, (\d+)%/, ", $1%");
+}
+
+function loadUserSchemes(): ColorScheme[] {
+  try {
+    const raw = localStorage.getItem("avionics-user-schemes");
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveUserSchemes(schemes: ColorScheme[]) {
+  localStorage.setItem("avionics-user-schemes", JSON.stringify(schemes));
+}
+
+// ── HSL Slider Row ─────────────────────────────────────────────
+const HslSlider = ({ label, hsl, onChange }: {
+  label: string;
+  hsl: [number, number, number];
+  onChange: (val: [number, number, number]) => void;
+}) => {
+  const [h, s, l] = hsl;
+  const color = `hsl(${h}, ${s}%, ${l}%)`;
+
+  return (
+    <div className="px-3 py-1.5 border-b border-avionics-divider/30">
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-sm border border-avionics-divider" style={{ background: color }} />
+          <span className="text-[9px] font-mono text-avionics-white">{label}</span>
+        </div>
+        <span className="text-[8px] font-mono text-avionics-label">{h}° {s}% {l}%</span>
+      </div>
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <span className="text-[7px] font-mono text-avionics-label w-3">H</span>
+          <input type="range" min={0} max={360} value={h}
+            onChange={(e) => onChange([parseInt(e.target.value), s, l])}
+            className="flex-1 h-1 accent-avionics-cyan cursor-pointer"
+            style={{ accentColor: color }}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[7px] font-mono text-avionics-label w-3">S</span>
+          <input type="range" min={0} max={100} value={s}
+            onChange={(e) => onChange([h, parseInt(e.target.value), l])}
+            className="flex-1 h-1 cursor-pointer"
+            style={{ accentColor: color }}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[7px] font-mono text-avionics-label w-3">L</span>
+          <input type="range" min={10} max={90} value={l}
+            onChange={(e) => onChange([h, s, parseInt(e.target.value)])}
+            className="flex-1 h-1 cursor-pointer"
+            style={{ accentColor: color }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Display Tab ────────────────────────────────────────────────
 const DisplayTab = () => {
-  const [activeScheme, setActiveScheme] = useState(() => {
-    return localStorage.getItem("avionics-color-scheme") || "default";
-  });
+  const [userSchemes, setUserSchemes] = useState<ColorScheme[]>(loadUserSchemes);
+  const allSchemes = [...BUILTIN_SCHEMES, ...userSchemes];
+
+  const [activeSchemeId, setActiveSchemeId] = useState(() =>
+    localStorage.getItem("avionics-color-scheme") || "default"
+  );
+  const [editing, setEditing] = useState(false);
+  const [editVars, setEditVars] = useState<Record<string, string>>({});
+  const [editName, setEditName] = useState("");
   const [brightness, setBrightness] = useState(100);
 
-  const applyScheme = useCallback((schemeId: string) => {
-    const scheme = COLOR_SCHEMES.find((s) => s.id === schemeId);
-    if (!scheme) return;
+  const applyVars = useCallback((vars: Record<string, string>) => {
     const root = document.documentElement;
-    Object.entries(scheme.vars).forEach(([key, value]) => {
-      root.style.setProperty(key, value);
-    });
-    setActiveScheme(schemeId);
+    Object.entries(vars).forEach(([key, value]) => root.style.setProperty(key, value));
+  }, []);
+
+  const applyScheme = useCallback((schemeId: string) => {
+    const scheme = allSchemes.find((s) => s.id === schemeId);
+    if (!scheme) return;
+    applyVars(scheme.vars);
+    setActiveSchemeId(schemeId);
     localStorage.setItem("avionics-color-scheme", schemeId);
-  }, []);
+    setEditing(false);
+  }, [allSchemes, applyVars]);
 
-  // Apply saved scheme on mount
   useEffect(() => {
-    applyScheme(activeScheme);
+    const scheme = allSchemes.find((s) => s.id === activeSchemeId);
+    if (scheme) applyVars(scheme.vars);
   }, []);
 
+  const startEditing = (scheme?: ColorScheme) => {
+    const base = scheme || allSchemes.find((s) => s.id === activeSchemeId) || BUILTIN_SCHEMES[0];
+    setEditVars({ ...base.vars });
+    setEditName(scheme && !scheme.builtin ? scheme.name : "Custom " + (userSchemes.length + 1));
+    setEditing(true);
+  };
+
+  const handleEditVarChange = (key: string, hsl: [number, number, number]) => {
+    const newVars = { ...editVars, [key]: toHslStr(...hsl) };
+    setEditVars(newVars);
+    applyVars(newVars); // live preview
+  };
+
+  const saveEditedScheme = () => {
+    const id = "user_" + Date.now();
+    const existing = userSchemes.find((s) => s.name === editName);
+    let updated: ColorScheme[];
+    if (existing) {
+      updated = userSchemes.map((s) => s.name === editName ? { ...s, vars: { ...editVars } } : s);
+    } else {
+      updated = [...userSchemes, { id, name: editName, vars: { ...editVars } }];
+    }
+    setUserSchemes(updated);
+    saveUserSchemes(updated);
+    const savedId = existing?.id || id;
+    setActiveSchemeId(savedId);
+    localStorage.setItem("avionics-color-scheme", savedId);
+    setEditing(false);
+  };
+
+  const deleteScheme = (schemeId: string) => {
+    const updated = userSchemes.filter((s) => s.id !== schemeId);
+    setUserSchemes(updated);
+    saveUserSchemes(updated);
+    if (activeSchemeId === schemeId) applyScheme("default");
+  };
+
+  const cancelEdit = () => {
+    setEditing(false);
+    // restore active scheme
+    const scheme = allSchemes.find((s) => s.id === activeSchemeId);
+    if (scheme) applyVars(scheme.vars);
+  };
+
+  // ── Editor view ──
+  if (editing) {
+    return (
+      <div>
+        <div className="flex items-center justify-between px-3 py-2 border-b border-avionics-divider bg-avionics-panel">
+          <span className="font-mono text-[10px] text-avionics-amber">EDIT SCHEME</span>
+          <div className="flex items-center gap-1.5">
+            <button onClick={cancelEdit} className="px-2 py-1 text-[8px] font-mono text-avionics-label border border-avionics-divider rounded hover:bg-avionics-button">
+              CANCEL
+            </button>
+            <button onClick={saveEditedScheme} className="px-2 py-1 text-[8px] font-mono text-avionics-green border border-avionics-green/40 rounded hover:bg-avionics-green/10 flex items-center gap-1">
+              <Save className="w-2.5 h-2.5" /> SAVE
+            </button>
+          </div>
+        </div>
+
+        {/* Name input */}
+        <div className="px-3 py-2 border-b border-avionics-divider/50">
+          <span className="text-[8px] font-mono text-avionics-label block mb-1">SCHEME NAME</span>
+          <input
+            type="text"
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            maxLength={20}
+            className="w-full bg-avionics-inset text-avionics-white font-mono text-[10px] px-2 py-1.5 rounded border border-avionics-divider focus:border-avionics-cyan focus:outline-none"
+          />
+        </div>
+
+        {/* Live preview bar */}
+        <div className="px-3 py-2 border-b border-avionics-divider/50">
+          <span className="text-[8px] font-mono text-avionics-label block mb-1">PREVIEW</span>
+          <div className="flex h-6 rounded overflow-hidden border border-avionics-divider/50">
+            {VAR_LABELS.map(({ key, label }) => (
+              <div
+                key={key}
+                className="flex-1 flex items-center justify-center"
+                style={{ background: `hsl(${editVars[key]})` }}
+              >
+                <span className="text-[6px] font-mono font-bold text-black/70">{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* HSL sliders */}
+        {VAR_LABELS.map(({ key, label }) => (
+          <HslSlider
+            key={key}
+            label={label}
+            hsl={parseHsl(editVars[key] || "160 100% 45%")}
+            onChange={(val) => handleEditVarChange(key, val)}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  // ── Selector view ──
   return (
     <div>
       {/* Backlight */}
@@ -408,40 +561,66 @@ const DisplayTab = () => {
         </div>
       </div>
 
-      {/* Color Scheme Selector */}
-      <div className="px-3 py-1.5 border-b border-avionics-divider">
+      {/* Color Scheme header + New button */}
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-avionics-divider">
         <span className="font-mono text-[9px] text-avionics-amber">COLOR SCHEME</span>
+        <button
+          onClick={() => startEditing()}
+          className="flex items-center gap-1 px-1.5 py-0.5 text-[8px] font-mono text-avionics-cyan border border-avionics-cyan/30 rounded hover:bg-avionics-cyan/10"
+        >
+          <Plus className="w-2.5 h-2.5" /> NEW
+        </button>
       </div>
+
+      {/* Scheme grid */}
       <div className="grid grid-cols-2 gap-2 p-3">
-        {COLOR_SCHEMES.map((scheme) => {
-          const isActive = activeScheme === scheme.id;
+        {allSchemes.map((scheme) => {
+          const isActive = activeSchemeId === scheme.id;
+          const primaryHsl = scheme.vars["--avionics-green"] || "160 100% 45%";
+          const accentHsl = scheme.vars["--avionics-cyan"] || "185 100% 55%";
           return (
-            <button
-              key={scheme.id}
-              onClick={() => applyScheme(scheme.id)}
-              className={`relative flex flex-col items-center gap-1.5 p-2 rounded border transition-all ${
-                isActive
-                  ? "border-avionics-cyan bg-avionics-button-active"
-                  : "border-avionics-divider/50 bg-avionics-inset hover:border-avionics-divider hover:bg-avionics-button"
-              }`}
-            >
-              {/* Preview swatch */}
-              <div
-                className="w-full h-5 rounded-sm flex overflow-hidden"
-                style={{ background: scheme.preview.bg }}
+            <div key={scheme.id} className="relative">
+              <button
+                onClick={() => applyScheme(scheme.id)}
+                className={`w-full flex flex-col items-center gap-1.5 p-2 rounded border transition-all ${
+                  isActive
+                    ? "border-avionics-cyan bg-avionics-button-active"
+                    : "border-avionics-divider/50 bg-avionics-inset hover:border-avionics-divider hover:bg-avionics-button"
+                }`}
               >
-                <div className="flex-1" style={{ background: scheme.preview.primary, opacity: 0.85 }} />
-                <div className="flex-1" style={{ background: scheme.preview.accent, opacity: 0.85 }} />
-              </div>
-              <span className={`font-mono text-[9px] ${isActive ? "text-avionics-cyan" : "text-avionics-label"}`}>
-                {scheme.name}
-              </span>
-              {isActive && (
-                <div className="absolute top-1 right-1">
-                  <Check className="w-3 h-3 text-avionics-cyan" />
+                <div className="w-full h-5 rounded-sm flex overflow-hidden" style={{ background: "hsl(220,20%,8%)" }}>
+                  <div className="flex-1" style={{ background: `hsl(${primaryHsl})`, opacity: 0.85 }} />
+                  <div className="flex-1" style={{ background: `hsl(${accentHsl})`, opacity: 0.85 }} />
+                </div>
+                <span className={`font-mono text-[9px] ${isActive ? "text-avionics-cyan" : "text-avionics-label"}`}>
+                  {scheme.name}
+                </span>
+                {isActive && (
+                  <div className="absolute top-1 right-1">
+                    <Check className="w-3 h-3 text-avionics-cyan" />
+                  </div>
+                )}
+              </button>
+              {/* Edit / Delete for user schemes */}
+              {!scheme.builtin && (
+                <div className="absolute top-1 left-1 flex gap-0.5">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); startEditing(scheme); }}
+                    className="p-0.5 rounded bg-avionics-panel/80 hover:bg-avionics-button border border-avionics-divider/50"
+                    title="Edit"
+                  >
+                    <PenLine className="w-2.5 h-2.5 text-avionics-amber" />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); deleteScheme(scheme.id); }}
+                    className="p-0.5 rounded bg-avionics-panel/80 hover:bg-destructive/20 border border-avionics-divider/50"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-2.5 h-2.5 text-destructive" />
+                  </button>
                 </div>
               )}
-            </button>
+            </div>
           );
         })}
       </div>
