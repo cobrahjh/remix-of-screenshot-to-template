@@ -381,14 +381,18 @@ export const MapDisplay = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Sync base tile layer with dark/light display mode
+  // Sync base tile layer with display mode
   useEffect(() => {
     const observer = new MutationObserver(() => {
       if (!mapInstance.current || !baseTileLayer.current) return;
-      const isDark = !document.documentElement.classList.contains("light");
-      const newUrl = isDark
-        ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-        : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+      const root = document.documentElement;
+      const isLight = root.classList.contains("light");
+      const isHighContrast = root.classList.contains("high-contrast");
+      const newUrl = isLight
+        ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+        : isHighContrast
+        ? "https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png"
+        : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
       baseTileLayer.current.setUrl(newUrl);
     });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });

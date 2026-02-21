@@ -11,10 +11,11 @@ const queryClient = new QueryClient();
 // Restore display mode on app load
 (() => {
   const mode = localStorage.getItem("avionics-display-mode");
+  document.documentElement.classList.remove("light", "high-contrast");
   if (mode === "light") {
     document.documentElement.classList.add("light");
-  } else {
-    document.documentElement.classList.remove("light");
+  } else if (mode === "high-contrast") {
+    document.documentElement.classList.add("high-contrast");
   }
 })();
 
