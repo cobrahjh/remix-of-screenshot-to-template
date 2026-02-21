@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useFlightData } from "../FlightDataContext";
-import { PlaneTakeoff, AlertTriangle, ChevronDown, ChevronUp, Wind, Radio, Navigation } from "lucide-react";
+import { PlaneTakeoff, AlertTriangle, ChevronDown, ChevronUp, Wind, Radio, Navigation, ShieldAlert } from "lucide-react";
 
 interface RunwayData {
   id: string;
@@ -973,6 +973,11 @@ export const SafeTaxiScreen = () => {
   const [notamsOpen, setNotamsOpen] = useState(false);
   const [atisOpen, setAtisOpen] = useState(false);
   const [showTaxiRoute, setShowTaxiRoute] = useState(true);
+  const [xwindDismissed, setXwindDismissed] = useState(false);
+
+  // Aircraft crosswind limits (Cessna 172 demonstrated)
+  const XWIND_LIMIT = 15; // kt demonstrated crosswind component
+  const XWIND_CAUTION = 12; // kt caution threshold
 
   const airport = AIRPORTS[selectedAirport];
   const notams = NOTAMS[selectedAirport] || [];
@@ -984,11 +989,46 @@ export const SafeTaxiScreen = () => {
     [airport.runways, wind.direction]
   );
 
+  // Compute crosswind warnings for all preferred runways
+  const xwindWarnings = useMemo(() => {
+    const effectiveSpeed = wind.gust || wind.speed;
+    const warnings: { runway: string; crosswind: number; gustXwind: number | null; exceeded: boolean; caution: boolean }[] = [];
+    for (const rw of airport.runways) {
+      for (const hdg of rw.headings) {
+        if (preferredRunways.has(hdg)) {
+          const rwyHdg = parseInt(hdg.replace(/[LRC]/g, "")) * 10;
+          const steadyXw = Math.abs(Math.round(wind.speed * Math.sin(((wind.direction - rwyHdg) * Math.PI) / 180)));
+          const gustXw = wind.gust
+            ? Math.abs(Math.round(wind.gust * Math.sin(((wind.direction - rwyHdg) * Math.PI) / 180)))
+            : null;
+          const maxXw = gustXw ?? steadyXw;
+          warnings.push({
+            runway: hdg,
+            crosswind: steadyXw,
+            gustXwind: gustXw,
+            exceeded: maxXw > XWIND_LIMIT,
+            caution: maxXw > XWIND_CAUTION && maxXw <= XWIND_LIMIT,
+          });
+        }
+      }
+    }
+    return warnings;
+  }, [airport.runways, preferredRunways, wind]);
+
+  const hasXwindExceeded = xwindWarnings.some(w => w.exceeded);
+  const hasXwindCaution = xwindWarnings.some(w => w.caution);
+
+  // Reset dismiss when airport changes
+  const [prevAirport, setPrevAirport] = useState(selectedAirport);
+  if (prevAirport !== selectedAirport) {
+    setPrevAirport(selectedAirport);
+    setXwindDismissed(false);
+  }
+
   // Get the active taxi route for the first preferred runway
   const activeTaxiRoute = useMemo(() => {
     const routes = TAXI_ROUTES[selectedAirport];
     if (!routes) return null;
-    // Find first preferred runway that has a route
     for (const rw of airport.runways) {
       for (const hdg of rw.headings) {
         if (preferredRunways.has(hdg) && routes[hdg]) {
@@ -1064,6 +1104,47 @@ export const SafeTaxiScreen = () => {
           <span className="font-mono text-[9px] text-purple-200 font-bold">{activeTaxiRoute.runway}</span>
           <span className="font-mono text-[8px] text-purple-400">VIA</span>
           <span className="font-mono text-[9px] text-purple-200">{activeTaxiRoute.taxiways.join(" · ")}</span>
+        </div>
+      )}
+
+      {/* Crosswind limit warning */}
+      {(hasXwindExceeded || hasXwindCaution) && !xwindDismissed && (
+        <div className={`flex items-center gap-2 px-3 py-1.5 border-b ${
+          hasXwindExceeded
+            ? "border-red-500/50 bg-red-950/50"
+            : "border-yellow-500/40 bg-yellow-950/30"
+        }`}>
+          <ShieldAlert className={`w-4 h-4 shrink-0 ${hasXwindExceeded ? "text-red-400" : "text-yellow-400"}`}>
+            {hasXwindExceeded && (
+              <animate attributeName="opacity" values="1;0.4;1" dur="1s" repeatCount="indefinite" />
+            )}
+          </ShieldAlert>
+          <div className="flex-1 flex flex-col gap-0.5">
+            <span className={`font-mono text-[9px] font-bold ${hasXwindExceeded ? "text-red-300" : "text-yellow-300"}`}>
+              {hasXwindExceeded ? "⚠ CROSSWIND LIMIT EXCEEDED" : "⚠ CROSSWIND ADVISORY"}
+            </span>
+            <div className="flex items-center gap-3 flex-wrap">
+              {xwindWarnings.filter(w => w.exceeded || w.caution).map(w => (
+                <span key={w.runway} className={`font-mono text-[8px] ${w.exceeded ? "text-red-200" : "text-yellow-200"}`}>
+                  RWY {w.runway}: X{w.crosswind}KT{w.gustXwind ? ` (G${w.gustXwind})` : ""}
+                  {w.exceeded ? ` › ${XWIND_LIMIT}KT MAX` : ` ≈ ${XWIND_LIMIT}KT LIM`}
+                </span>
+              ))}
+            </div>
+            <span className={`font-mono text-[7px] ${hasXwindExceeded ? "text-red-400" : "text-yellow-400"}`}>
+              C172 DEMONSTRATED CROSSWIND: {XWIND_LIMIT}KT
+            </span>
+          </div>
+          <button
+            onClick={() => setXwindDismissed(true)}
+            className={`font-mono text-[7px] px-2 py-0.5 rounded border shrink-0 ${
+              hasXwindExceeded
+                ? "border-red-500/50 text-red-300 hover:bg-red-900/50"
+                : "border-yellow-500/50 text-yellow-300 hover:bg-yellow-900/50"
+            }`}
+          >
+            ACK
+          </button>
         </div>
       )}
 
