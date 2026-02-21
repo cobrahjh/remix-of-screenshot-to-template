@@ -135,12 +135,15 @@
     border-top-color: hsl(220 15% 14%);
   }
 
-  /* Leaflet container dark background to prevent white flash */
-  .leaflet-container {
+  /* Leaflet dark background to prevent white flash on missing tiles */
+  .leaflet-container,
+  .leaflet-tile-pane,
+  .leaflet-layer,
+  .leaflet-overlay-pane {
     background: hsl(220, 20%, 8%) !important;
   }
 
-  .leaflet-tile-pane {
+  .leaflet-tile {
     background: hsl(220, 20%, 8%) !important;
   }
 
