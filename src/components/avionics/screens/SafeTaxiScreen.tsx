@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useFlightData } from "../FlightDataContext";
-import { PlaneTakeoff, AlertTriangle, ChevronDown, ChevronUp, Wind, Radio, Navigation, ShieldAlert, Plane } from "lucide-react";
+import { PlaneTakeoff, AlertTriangle, ChevronDown, ChevronUp, Wind, Radio, Navigation, ShieldAlert, Plane, Droplets, Snowflake, CloudSnow } from "lucide-react";
 
 interface RunwayData {
   id: string;
@@ -1063,6 +1063,24 @@ const AIRCRAFT_TYPES: AircraftType[] = [
   { id: "c525", name: "Cessna Citation CJ2", shortName: "C525", xwindLimit: 25, xwindCaution: 20, category: "JET" },
 ];
 
+// Runway contamination types with crosswind limit reduction factors
+type ContaminationType = "dry" | "wet" | "snow" | "ice";
+
+interface ContaminationInfo {
+  label: string;
+  shortLabel: string;
+  factor: number; // multiplier applied to xwind limit (1.0 = no change)
+  color: string; // for UI display
+  icon: "none" | "droplets" | "snowflake" | "ice";
+}
+
+const CONTAMINATION_TYPES: Record<ContaminationType, ContaminationInfo> = {
+  dry:  { label: "Dry",  shortLabel: "DRY",  factor: 1.0,  color: "hsl(160 80% 50%)", icon: "none" },
+  wet:  { label: "Wet",  shortLabel: "WET",  factor: 0.85, color: "hsl(200 80% 55%)", icon: "droplets" },
+  snow: { label: "Snow", shortLabel: "SNOW", factor: 0.65, color: "hsl(0 0% 85%)",    icon: "snowflake" },
+  ice:  { label: "Ice",  shortLabel: "ICE",  factor: 0.50, color: "hsl(195 100% 70%)", icon: "ice" },
+};
+
 export const SafeTaxiScreen = () => {
   const { flight } = useFlightData();
   const [selectedAirport, setSelectedAirport] = useState<string>("KMRY");
@@ -1072,6 +1090,22 @@ export const SafeTaxiScreen = () => {
   const [xwindDismissed, setXwindDismissed] = useState(false);
   const [selectedAircraft, setSelectedAircraft] = useState<string>("c172");
   const [showAircraftPicker, setShowAircraftPicker] = useState(false);
+
+  const [runwayContamination, setRunwayContamination] = useState<Record<string, ContaminationType>>({});
+  const [showContaminationPicker, setShowContaminationPicker] = useState<string | null>(null);
+
+  const getContamination = useCallback((rwId: string): ContaminationType => {
+    return runwayContamination[`${selectedAirport}-${rwId}`] || "dry";
+  }, [runwayContamination, selectedAirport]);
+
+  const setContamination = useCallback((rwId: string, type: ContaminationType) => {
+    setRunwayContamination(prev => ({
+      ...prev,
+      [`${selectedAirport}-${rwId}`]: type,
+    }));
+    setShowContaminationPicker(null);
+    setXwindDismissed(false);
+  }, [selectedAirport]);
 
   const aircraft = AIRCRAFT_TYPES.find(a => a.id === selectedAircraft) || AIRCRAFT_TYPES[0];
   const XWIND_LIMIT = aircraft.xwindLimit;
@@ -1087,11 +1121,14 @@ export const SafeTaxiScreen = () => {
     [airport.runways, wind.direction]
   );
 
-  // Compute crosswind warnings for all preferred runways
+  // Compute crosswind warnings for all preferred runways (with contamination factor)
   const xwindWarnings = useMemo(() => {
-    const effectiveSpeed = wind.gust || wind.speed;
-    const warnings: { runway: string; crosswind: number; gustXwind: number | null; exceeded: boolean; caution: boolean }[] = [];
+    const warnings: { runway: string; rwId: string; crosswind: number; gustXwind: number | null; exceeded: boolean; caution: boolean; effectiveLimit: number; contamination: ContaminationType }[] = [];
     for (const rw of airport.runways) {
+      const contamination = getContamination(rw.id);
+      const factor = CONTAMINATION_TYPES[contamination].factor;
+      const effectiveLimit = Math.round(XWIND_LIMIT * factor);
+      const effectiveCaution = Math.round(XWIND_CAUTION * factor);
       for (const hdg of rw.headings) {
         if (preferredRunways.has(hdg)) {
           const rwyHdg = parseInt(hdg.replace(/[LRC]/g, "")) * 10;
@@ -1102,16 +1139,19 @@ export const SafeTaxiScreen = () => {
           const maxXw = gustXw ?? steadyXw;
           warnings.push({
             runway: hdg,
+            rwId: rw.id,
             crosswind: steadyXw,
             gustXwind: gustXw,
-            exceeded: maxXw > XWIND_LIMIT,
-            caution: maxXw > XWIND_CAUTION && maxXw <= XWIND_LIMIT,
+            exceeded: maxXw > effectiveLimit,
+            caution: maxXw > effectiveCaution && maxXw <= effectiveLimit,
+            effectiveLimit,
+            contamination,
           });
         }
       }
     }
     return warnings;
-  }, [airport.runways, preferredRunways, wind, XWIND_LIMIT, XWIND_CAUTION]);
+  }, [airport.runways, preferredRunways, wind, XWIND_LIMIT, XWIND_CAUTION, getContamination]);
 
   const hasXwindExceeded = xwindWarnings.some(w => w.exceeded);
   const hasXwindCaution = xwindWarnings.some(w => w.caution);
@@ -1305,12 +1345,18 @@ export const SafeTaxiScreen = () => {
               {xwindWarnings.filter(w => w.exceeded || w.caution).map(w => (
                 <span key={w.runway} className={`font-mono text-[8px] ${w.exceeded ? "text-red-200" : "text-yellow-200"}`}>
                   RWY {w.runway}: X{w.crosswind}KT{w.gustXwind ? ` (G${w.gustXwind})` : ""}
-                  {w.exceeded ? ` › ${XWIND_LIMIT}KT MAX` : ` ≈ ${XWIND_LIMIT}KT LIM`}
+                  {w.exceeded ? ` › ${w.effectiveLimit}KT MAX` : ` ≈ ${w.effectiveLimit}KT LIM`}
+                  {w.contamination !== "dry" && (
+                    <span className="ml-1 opacity-80">[{CONTAMINATION_TYPES[w.contamination].shortLabel}]</span>
+                  )}
                 </span>
               ))}
             </div>
             <span className={`font-mono text-[7px] ${hasXwindExceeded ? "text-red-400" : "text-yellow-400"}`}>
-              {aircraft.shortName} DEMONSTRATED CROSSWIND: {XWIND_LIMIT}KT
+              {aircraft.shortName} XWIND: {XWIND_LIMIT}KT
+              {xwindWarnings.some(w => w.contamination !== "dry") && (
+                <span className="ml-1">(REDUCED FOR CONTAMINATION)</span>
+              )}
             </span>
           </div>
           <button
@@ -1726,8 +1772,8 @@ export const SafeTaxiScreen = () => {
         </svg>
       </div>
 
-      {/* Runway info strip with crosswind components */}
-      <div className="border-t border-avionics-divider bg-avionics-panel px-3 py-1.5">
+      {/* Runway info strip with crosswind components & contamination */}
+      <div className="border-t border-avionics-divider bg-avionics-panel px-3 py-1.5 relative">
         <div className="flex items-center gap-4 overflow-x-auto">
           {airport.runways.map((rw) => {
             const pref0 = preferredRunways.has(rw.headings[0]);
@@ -1736,9 +1782,11 @@ export const SafeTaxiScreen = () => {
             const hdg1 = parseInt(rw.headings[1].replace(/[LRC]/g, "")) * 10;
             const wc0 = getWindComponents(wind.direction, wind.speed, hdg0);
             const wc1 = getWindComponents(wind.direction, wind.speed, hdg1);
-            // Show components for the preferred end
             const activeHdg = pref0 ? 0 : 1;
             const wc = activeHdg === 0 ? wc0 : wc1;
+            const contamination = getContamination(rw.id);
+            const contInfo = CONTAMINATION_TYPES[contamination];
+            const effectiveLimit = Math.round(XWIND_LIMIT * contInfo.factor);
             return (
               <div key={rw.id} className="flex items-center gap-1.5 shrink-0">
                 <span className={`font-mono text-[9px] ${pref0 ? "text-avionics-green" : "text-avionics-label"}`}>
@@ -1751,18 +1799,74 @@ export const SafeTaxiScreen = () => {
                   {rw.headings[1]}
                 </span>
                 <span className="font-mono text-[7px] text-avionics-label">{rw.surface.toUpperCase()}</span>
+                {/* Contamination selector */}
+                <div className="relative" style={{ overflow: "visible" }}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowContaminationPicker(showContaminationPicker === rw.id ? null : rw.id);
+                    }}
+                    className="font-mono text-[7px] px-1 py-0.5 rounded border transition-colors"
+                    style={{
+                      borderColor: contamination === "dry" ? "hsl(var(--avionics-divider))" : contInfo.color,
+                      color: contInfo.color,
+                      backgroundColor: contamination !== "dry" ? `${contInfo.color}15` : "transparent",
+                    }}
+                  >
+                    {contamination === "wet" && <Droplets className="w-2 h-2 inline-block mr-0.5" />}
+                    {contamination === "snow" && <Snowflake className="w-2 h-2 inline-block mr-0.5" />}
+                    {contamination === "ice" && <CloudSnow className="w-2 h-2 inline-block mr-0.5" />}
+                    {contInfo.shortLabel}
+                  </button>
+                </div>
                 <span className="font-mono text-[7px] text-avionics-label">│</span>
                 <span className={`font-mono text-[7px] ${wc.headwind >= 0 ? "text-avionics-green" : "text-avionics-amber"}`}>
                   {wc.headwind >= 0 ? "H" : "T"}{Math.abs(wc.headwind)}
                 </span>
-                <span className={`font-mono text-[7px] ${wc.crosswind > 15 ? "text-avionics-red" : wc.crosswind > 10 ? "text-avionics-amber" : "text-avionics-cyan"}`}>
+                <span className={`font-mono text-[7px] ${wc.crosswind > effectiveLimit ? "text-avionics-red" : wc.crosswind > effectiveLimit * 0.7 ? "text-avionics-amber" : "text-avionics-cyan"}`}>
                   X{wc.crosswind}{wc.crossDir > 0.5 ? "R" : wc.crossDir < -0.5 ? "L" : ""}
                 </span>
+                {contamination !== "dry" && (
+                  <span className="font-mono text-[6px] text-avionics-label">LIM:{effectiveLimit}KT</span>
+                )}
               </div>
             );
           })}
         </div>
       </div>
+
+      {/* Floating contamination picker */}
+      {showContaminationPicker && (() => {
+        const targetRw = airport.runways.find(r => r.id === showContaminationPicker);
+        if (!targetRw) return null;
+        const currentCont = getContamination(targetRw.id);
+        return (
+          <div className="border-t border-avionics-divider bg-avionics-panel px-3 py-1">
+            <div className="flex items-center gap-1">
+              <span className="font-mono text-[7px] text-avionics-label mr-1">RWY {targetRw.id} CONDITION:</span>
+              {(Object.entries(CONTAMINATION_TYPES) as [ContaminationType, ContaminationInfo][]).map(([key, info]) => (
+                <button
+                  key={key}
+                  onClick={(e) => { e.stopPropagation(); setContamination(targetRw.id, key); }}
+                  className={`font-mono text-[8px] px-1.5 py-0.5 rounded border transition-colors flex items-center gap-0.5 ${
+                    key === currentCont ? "bg-avionics-button font-bold" : "hover:bg-avionics-button"
+                  }`}
+                  style={{
+                    borderColor: key === currentCont ? info.color : "hsl(var(--avionics-divider))",
+                    color: info.color,
+                  }}
+                >
+                  {key === "wet" && <Droplets className="w-2.5 h-2.5" />}
+                  {key === "snow" && <Snowflake className="w-2.5 h-2.5" />}
+                  {key === "ice" && <CloudSnow className="w-2.5 h-2.5" />}
+                  {info.shortLabel}
+                  <span className="text-[6px] opacity-60">{info.factor < 1 ? `×${info.factor}` : ""}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Footer */}
       <div className="flex items-center justify-end px-3 py-1 border-t border-avionics-divider">
