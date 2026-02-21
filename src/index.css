@@ -185,16 +185,16 @@
     border-top-color: hsl(220 15% 14%);
   }
 
-  /* Leaflet dark background to prevent white flash on missing tiles */
+  /* Leaflet background to prevent flash on missing tiles */
   .leaflet-container,
   .leaflet-tile-pane,
   .leaflet-layer,
   .leaflet-overlay-pane {
-    background: hsl(220, 20%, 8%) !important;
+    background: hsl(var(--avionics-panel-dark)) !important;
   }
 
   .leaflet-tile {
-    background: hsl(220, 20%, 8%) !important;
+    background: hsl(var(--avionics-panel-dark)) !important;
   }
 
   /* Leaflet tooltip overrides for avionics style */
