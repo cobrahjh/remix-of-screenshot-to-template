@@ -102,7 +102,7 @@ function distNm(lat1: number, lng1: number, lat2: number, lng2: number) {
 export const FlightDataProvider = ({ children }: { children: React.ReactNode }) => {
   const [connectionMode, setConnectionMode] = useState<ConnectionMode>("none");
   const [testMode, setTestModeState] = useState(false);
-  const [wsUrl, setWsUrl] = useState("ws://localhost:8080");
+  const [wsUrl, setWsUrl] = useState("ws://192.168.1.42:8080");
   const wsRef = useRef<WebSocket | null>(null);
   const simRef = useRef({ legIndex: 0, legProgress: 0 });
 
@@ -228,7 +228,11 @@ export const FlightDataProvider = ({ children }: { children: React.ReactNode }) 
     try {
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
-      ws.onopen = () => setConnectionMode("websocket");
+      ws.onopen = () => {
+        setConnectionMode("websocket");
+        // Request Lovable format from SimGlass server
+        ws.send(JSON.stringify({ type: 'setFormat', format: 'lovable' }));
+      };
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
