@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useFlightData } from "../FlightDataContext";
-import { PlaneTakeoff } from "lucide-react";
+import { PlaneTakeoff, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 
 interface RunwayData {
   id: string;
@@ -667,11 +667,73 @@ const AircraftIcon = ({ x, y, heading }: { x: number; y: number; heading: number
   </g>
 );
 
+interface NotamEntry {
+  id: string;
+  type: "RWY" | "TWY" | "OBST" | "SVC" | "AIRSPACE" | "AD";
+  severity: "warn" | "caution" | "info";
+  text: string;
+  effective: string;
+}
+
+const NOTAMS: Record<string, NotamEntry[]> = {
+  KMRY: [
+    { id: "01/024", type: "TWY", severity: "caution", text: "TWY B EDGE LGTS U/S", effective: "UNTIL 2026-03-15" },
+    { id: "01/031", type: "OBST", severity: "warn", text: "CRANE 150 FT AGL 0.5 NM NE OF RWY 10R", effective: "UNTIL 2026-04-01" },
+    { id: "01/018", type: "SVC", severity: "info", text: "ATIS FREQ 124.90 TEMPORARILY 126.25", effective: "UNTIL 2026-03-01" },
+  ],
+  KSNS: [
+    { id: "02/005", type: "RWY", severity: "warn", text: "RWY 14/32 CLSD FOR MAINTENANCE", effective: "UNTIL 2026-03-10" },
+    { id: "02/008", type: "AD", severity: "info", text: "ARFF INDEX DOWNGRADED TO A", effective: "UNTIL FURTHER NOTICE" },
+  ],
+  KSJC: [
+    { id: "02/041", type: "RWY", severity: "caution", text: "RWY 12L/30R THRESHOLD DISPLACED 500 FT", effective: "UNTIL 2026-04-15" },
+    { id: "02/039", type: "TWY", severity: "warn", text: "TWY Z CLSD BTN TWY A AND RAMP", effective: "UNTIL 2026-03-20" },
+    { id: "02/045", type: "OBST", severity: "caution", text: "TOWER CRANE 200 FT AGL 1 NM SOUTH", effective: "UNTIL 2026-05-01" },
+    { id: "02/050", type: "SVC", severity: "info", text: "PAPI RWY 30L OTS", effective: "UNTIL 2026-03-05" },
+  ],
+  KSFO: [
+    { id: "02/112", type: "RWY", severity: "warn", text: "RWY 01R/19L CLSD 0300-1100 LOCAL DAILY", effective: "UNTIL 2026-04-30" },
+    { id: "02/108", type: "TWY", severity: "caution", text: "TWY K RESTRICTED TO ACFT WINGSPAN < 118 FT", effective: "PERMANENT" },
+    { id: "02/115", type: "AIRSPACE", severity: "warn", text: "TFR WITHIN 1 NM VIP MOVEMENT", effective: "2026-02-22 1400-2200Z" },
+    { id: "02/120", type: "SVC", severity: "info", text: "ILS RWY 28R GP OTS", effective: "UNTIL 2026-03-12" },
+  ],
+  KOAK: [
+    { id: "02/071", type: "TWY", severity: "caution", text: "TWY W PAVEMENT MARKINGS FADED", effective: "UNTIL 2026-04-01" },
+    { id: "02/068", type: "OBST", severity: "warn", text: "CONSTRUCTION AREA NE SIDE 100 FT AGL", effective: "UNTIL 2026-06-01" },
+    { id: "02/075", type: "AD", severity: "info", text: "NOISE ABATEMENT PROCS IN EFFECT 2200-0600", effective: "PERMANENT" },
+  ],
+  KLAX: [
+    { id: "02/201", type: "RWY", severity: "warn", text: "RWY 6R/24L CLSD 0100-0900 LOCAL DAILY", effective: "UNTIL 2026-05-15" },
+    { id: "02/198", type: "TWY", severity: "caution", text: "TWY E BTN RWY 6L AND TWY AA HOT SPOT HS1", effective: "PERMANENT" },
+    { id: "02/205", type: "TWY", severity: "caution", text: "TWY C SFC IRREGULAR — USE CAUTION", effective: "UNTIL 2026-03-30" },
+    { id: "02/210", type: "AIRSPACE", severity: "warn", text: "SPECIAL TRAFFIC MGMT PROG IN EFFECT", effective: "UNTIL 2026-04-01" },
+    { id: "02/215", type: "SVC", severity: "info", text: "SOUTH COMPLEX REIL RWY 25L OTS", effective: "UNTIL 2026-03-08" },
+  ],
+  KSAN: [
+    { id: "02/055", type: "RWY", severity: "caution", text: "RWY 9/27 RESURFACING IN PROGRESS — EXPECT DELAYS", effective: "UNTIL 2026-04-20" },
+    { id: "02/052", type: "OBST", severity: "warn", text: "CRANE 180 FT AGL PARKING GARAGE CONSTRUCTION S SIDE", effective: "UNTIL 2026-06-15" },
+    { id: "02/058", type: "AD", severity: "info", text: "NEW TERMINAL CONSTRUCTION — FOLLOW MARSHALLER", effective: "UNTIL 2026-12-01" },
+  ],
+  KBUR: [
+    { id: "02/033", type: "RWY", severity: "warn", text: "RWY 15/33 CLSD INDEFINITELY", effective: "UNTIL FURTHER NOTICE" },
+    { id: "02/030", type: "TWY", severity: "caution", text: "TWY G RESTRICTED — NO ACFT WINGSPAN > 79 FT", effective: "PERMANENT" },
+    { id: "02/036", type: "SVC", severity: "info", text: "VGSI RWY 08 OTS", effective: "UNTIL 2026-03-15" },
+  ],
+  KONT: [
+    { id: "02/085", type: "TWY", severity: "caution", text: "TWY D BTN RWY 8L AND RWY 8R — HOT SPOT HS2", effective: "PERMANENT" },
+    { id: "02/088", type: "OBST", severity: "warn", text: "CRANE 120 FT AGL CARGO APRON EAST SIDE", effective: "UNTIL 2026-04-10" },
+    { id: "02/090", type: "SVC", severity: "info", text: "ATIS NOW ON FREQ 127.75", effective: "PERMANENT" },
+    { id: "02/092", type: "AD", severity: "info", text: "BIRD ACTIVITY VICINITY ARPT", effective: "SEASONAL" },
+  ],
+};
+
 export const SafeTaxiScreen = () => {
   const { flight } = useFlightData();
   const [selectedAirport, setSelectedAirport] = useState<string>("KMRY");
+  const [notamsOpen, setNotamsOpen] = useState(false);
 
   const airport = AIRPORTS[selectedAirport];
+  const notams = NOTAMS[selectedAirport] || [];
 
   // Simple position mapping: place aircraft near a runway if close
   const ownshipX = 200;
@@ -710,6 +772,61 @@ export const SafeTaxiScreen = () => {
           <span className="font-mono text-[8px] text-avionics-label">TWR <span className="text-avionics-green">{airport.towerFreq}</span></span>
           <span className="font-mono text-[8px] text-avionics-label">ATIS <span className="text-avionics-cyan">{airport.atisFreq}</span></span>
         </div>
+      </div>
+
+      {/* NOTAM alerts */}
+      <div className="border-b border-avionics-divider/50">
+        <button
+          onClick={() => setNotamsOpen(!notamsOpen)}
+          className="w-full flex items-center justify-between px-3 py-1 bg-avionics-panel hover:bg-avionics-button transition-colors"
+        >
+          <div className="flex items-center gap-1.5">
+            <AlertTriangle className={`w-3 h-3 ${notams.some(n => n.severity === "warn") ? "text-avionics-amber" : "text-avionics-cyan"}`} />
+            <span className="font-mono text-[9px] text-avionics-white">
+              NOTAMS ({notams.length})
+            </span>
+            {notams.filter(n => n.severity === "warn").length > 0 && (
+              <span className="font-mono text-[8px] text-avionics-amber px-1 py-px border border-avionics-amber/40 rounded">
+                {notams.filter(n => n.severity === "warn").length} WARN
+              </span>
+            )}
+          </div>
+          {notamsOpen ? (
+            <ChevronUp className="w-3 h-3 text-avionics-label" />
+          ) : (
+            <ChevronDown className="w-3 h-3 text-avionics-label" />
+          )}
+        </button>
+        {notamsOpen && (
+          <div className="max-h-[120px] overflow-y-auto bg-avionics-inset">
+            {notams.map((notam) => (
+              <div
+                key={notam.id}
+                className="flex items-start gap-2 px-3 py-1 border-b border-avionics-divider/30 last:border-b-0"
+              >
+                <span
+                  className={`font-mono text-[7px] px-1 py-px rounded shrink-0 mt-px ${
+                    notam.severity === "warn"
+                      ? "bg-destructive/20 text-destructive"
+                      : notam.severity === "caution"
+                      ? "bg-avionics-amber/20 text-avionics-amber"
+                      : "bg-avionics-cyan/10 text-avionics-cyan"
+                  }`}
+                >
+                  {notam.type}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <span className="font-mono text-[8px] text-avionics-white leading-tight block">
+                    {notam.text}
+                  </span>
+                  <span className="font-mono text-[7px] text-avionics-label">
+                    {notam.id} — {notam.effective}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* SVG Airport Diagram */}
