@@ -113,8 +113,21 @@ function bearingDeg(lat1: number, lng1: number, lat2: number, lng2: number) {
   return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
 }
 
+/** SimBrief ICAO type code → our aircraft ID mapping */
+const SIMBRIEF_AIRCRAFT_MAP: Record<string, string> = {
+  C172: "c172", C182: "c182", C152: "c152",
+  PA28: "pa28", SR22: "sr22", BE36: "be36", DA40: "da40",
+  BE58: "be58", PA44: "pa44", C525: "c525",
+};
+
+interface SimBriefResult {
+  plan: FlightPlanWaypoint[];
+  aircraftId: string | null;
+  aircraftName: string | null;
+}
+
 /** Fetch and parse SimBrief OFP */
-async function fetchSimBrief(pilotId: string): Promise<FlightPlanWaypoint[] | null> {
+async function fetchSimBrief(pilotId: string): Promise<SimBriefResult | null> {
   try {
     const res = await fetch(`https://www.simbrief.com/api/xml.fetcher.php?username=${encodeURIComponent(pilotId)}&json=1`);
     if (!res.ok) return null;
@@ -122,6 +135,11 @@ async function fetchSimBrief(pilotId: string): Promise<FlightPlanWaypoint[] | nu
 
     const navlog = data?.navlog?.fix;
     if (!Array.isArray(navlog) || navlog.length < 2) return null;
+
+    // Extract aircraft info
+    const icaoCode = (data?.aircraft?.icaocode || "").toUpperCase();
+    const aircraftName = data?.aircraft?.name || null;
+    const aircraftId = SIMBRIEF_AIRCRAFT_MAP[icaoCode] || null;
 
     const waypoints: FlightPlanWaypoint[] = navlog.map((fix: any, i: number) => {
       const ident = fix.ident || `WP${i}`;
@@ -147,14 +165,14 @@ async function fetchSimBrief(pilotId: string): Promise<FlightPlanWaypoint[] | nu
       };
     });
 
-    return computeLegs(waypoints);
+    return { plan: computeLegs(waypoints), aircraftId, aircraftName };
   } catch {
     return null;
   }
 }
 
 /* ─── Import Dialog ─── */
-const ImportDialog = ({ onImport, onClose }: { onImport: (plan: FlightPlanWaypoint[]) => void; onClose: () => void }) => {
+const ImportDialog = ({ onImport, onClose }: { onImport: (plan: FlightPlanWaypoint[], aircraftId?: string | null) => void; onClose: () => void }) => {
   const [tab, setTab] = useState<"file" | "text" | "simbrief">("file");
   const [textInput, setTextInput] = useState("");
   const [simbriefId, setSimbriefId] = useState(() => localStorage.getItem("simbrief_pilot_id") || "");
@@ -162,6 +180,7 @@ const ImportDialog = ({ onImport, onClose }: { onImport: (plan: FlightPlanWaypoi
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<FlightPlanWaypoint[] | null>(null);
   const [simbriefMeta, setSimbriefMeta] = useState<string | null>(null);
+  const [simbriefAircraftId, setSimbriefAircraftId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -209,13 +228,16 @@ const ImportDialog = ({ onImport, onClose }: { onImport: (plan: FlightPlanWaypoi
     setError(null);
     setPreview(null);
     setSimbriefMeta(null);
+    setSimbriefAircraftId(null);
     setLoading(true);
     try {
       localStorage.setItem("simbrief_pilot_id", simbriefId.trim());
-      const plan = await fetchSimBrief(simbriefId.trim());
-      if (plan) {
-        setPreview(plan);
-        setSimbriefMeta(`${plan[0]?.name} → ${plan[plan.length - 1]?.name}`);
+      const result = await fetchSimBrief(simbriefId.trim());
+      if (result) {
+        setPreview(result.plan);
+        setSimbriefAircraftId(result.aircraftId);
+        const acLabel = result.aircraftName ? ` • ${result.aircraftName}` : "";
+        setSimbriefMeta(`${result.plan[0]?.name} → ${result.plan[result.plan.length - 1]?.name}${acLabel}`);
       } else {
         setError("No flight plan found. Check your Pilot ID and ensure you have a recent OFP generated.");
       }
@@ -228,7 +250,7 @@ const ImportDialog = ({ onImport, onClose }: { onImport: (plan: FlightPlanWaypoi
 
   const handleConfirm = () => {
     if (preview) {
-      onImport(preview);
+      onImport(preview, simbriefAircraftId);
       onClose();
     }
   };
@@ -566,7 +588,7 @@ const VnavProfile = ({ flightPlan, activeWaypointIndex }: { flightPlan: FlightPl
 };
 
 export const FlightPlanScreen = () => {
-  const { flightPlan, activeWaypointIndex, setActiveWaypoint, setFlightPlan, navigateTo } = useGtn();
+  const { flightPlan, activeWaypointIndex, setActiveWaypoint, setFlightPlan, setSelectedAircraft, navigateTo } = useGtn();
   const [selectedWp, setSelectedWp] = useState<number | null>(null);
   const [showVnav, setShowVnav] = useState(true);
   const [showImport, setShowImport] = useState(false);
@@ -590,7 +612,10 @@ export const FlightPlanScreen = () => {
       {/* Import dialog overlay */}
       {showImport && (
         <ImportDialog
-          onImport={(plan) => setFlightPlan(plan)}
+          onImport={(plan, aircraftId) => {
+            setFlightPlan(plan);
+            if (aircraftId) setSelectedAircraft(aircraftId);
+          }}
           onClose={() => setShowImport(false)}
         />
       )}
