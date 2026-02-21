@@ -11,6 +11,7 @@ interface RunwayData {
   width: number;
   angle: number; // degrees from north
   surface: "asphalt" | "concrete";
+  lengthFt: number; // runway length in feet
 }
 
 interface TaxiwayData {
@@ -48,6 +49,7 @@ const AIRPORTS: Record<string, AirportData> = {
         length: 280, width: 14,
         angle: 100,
         surface: "asphalt",
+        lengthFt: 7616,
       },
       {
         id: "10L/28R",
@@ -56,6 +58,7 @@ const AIRPORTS: Record<string, AirportData> = {
         length: 220, width: 10,
         angle: 100,
         surface: "asphalt",
+        lengthFt: 3500,
       },
     ],
     taxiways: [
@@ -91,6 +94,7 @@ const AIRPORTS: Record<string, AirportData> = {
         length: 260, width: 12,
         angle: 80,
         surface: "asphalt",
+        lengthFt: 4825,
       },
       {
         id: "14/32",
@@ -99,6 +103,7 @@ const AIRPORTS: Record<string, AirportData> = {
         length: 180, width: 10,
         angle: 140,
         surface: "asphalt",
+        lengthFt: 3300,
       },
     ],
     taxiways: [
@@ -130,6 +135,7 @@ const AIRPORTS: Record<string, AirportData> = {
         length: 260, width: 14,
         angle: 120,
         surface: "asphalt",
+        lengthFt: 11000,
       },
       {
         id: "12R/30L",
@@ -138,6 +144,7 @@ const AIRPORTS: Record<string, AirportData> = {
         length: 260, width: 14,
         angle: 120,
         surface: "concrete",
+        lengthFt: 11000,
       },
     ],
     taxiways: [
@@ -175,6 +182,7 @@ const AIRPORTS: Record<string, AirportData> = {
         length: 300, width: 14,
         angle: 100,
         surface: "asphalt",
+        lengthFt: 11870,
       },
       {
         id: "28R/10L",
@@ -183,6 +191,7 @@ const AIRPORTS: Record<string, AirportData> = {
         length: 300, width: 14,
         angle: 100,
         surface: "asphalt",
+        lengthFt: 11381,
       },
       {
         id: "01L/19R",
@@ -191,6 +200,7 @@ const AIRPORTS: Record<string, AirportData> = {
         length: 240, width: 12,
         angle: 10,
         surface: "asphalt",
+        lengthFt: 7650,
       },
       {
         id: "01R/19L",
@@ -199,6 +209,7 @@ const AIRPORTS: Record<string, AirportData> = {
         length: 240, width: 12,
         angle: 10,
         surface: "asphalt",
+        lengthFt: 8648,
       },
     ],
     taxiways: [
@@ -237,6 +248,7 @@ const AIRPORTS: Record<string, AirportData> = {
         length: 300, width: 14,
         angle: 120,
         surface: "asphalt",
+        lengthFt: 10520,
       },
       {
         id: "10L/28R",
@@ -245,6 +257,7 @@ const AIRPORTS: Record<string, AirportData> = {
         length: 260, width: 12,
         angle: 100,
         surface: "asphalt",
+        lengthFt: 6213,
       },
       {
         id: "10R/28L",
@@ -253,6 +266,7 @@ const AIRPORTS: Record<string, AirportData> = {
         length: 260, width: 12,
         angle: 100,
         surface: "asphalt",
+        lengthFt: 5454,
       },
     ],
     taxiways: [
@@ -290,6 +304,7 @@ const AIRPORTS: Record<string, AirportData> = {
         length: 310, width: 14,
         angle: 70,
         surface: "asphalt",
+        lengthFt: 8925,
       },
       {
         id: "6R/24L",
@@ -298,6 +313,7 @@ const AIRPORTS: Record<string, AirportData> = {
         length: 310, width: 14,
         angle: 70,
         surface: "asphalt",
+        lengthFt: 10285,
       },
       {
         id: "7L/25R",
@@ -306,6 +322,7 @@ const AIRPORTS: Record<string, AirportData> = {
         length: 310, width: 14,
         angle: 70,
         surface: "concrete",
+        lengthFt: 12091,
       },
       {
         id: "7R/25L",
@@ -314,6 +331,7 @@ const AIRPORTS: Record<string, AirportData> = {
         length: 310, width: 14,
         angle: 70,
         surface: "concrete",
+        lengthFt: 11095,
       },
     ],
     taxiways: [
@@ -353,6 +371,7 @@ const AIRPORTS: Record<string, AirportData> = {
         length: 320, width: 16,
         angle: 90,
         surface: "asphalt",
+        lengthFt: 9401,
       },
     ],
     taxiways: [
@@ -389,6 +408,7 @@ const AIRPORTS: Record<string, AirportData> = {
         length: 280, width: 14,
         angle: 80,
         surface: "asphalt",
+        lengthFt: 6886,
       },
       {
         id: "15/33",
@@ -397,6 +417,7 @@ const AIRPORTS: Record<string, AirportData> = {
         length: 200, width: 10,
         angle: 150,
         surface: "asphalt",
+        lengthFt: 5801,
       },
     ],
     taxiways: [
@@ -432,6 +453,7 @@ const AIRPORTS: Record<string, AirportData> = {
         length: 300, width: 14,
         angle: 80,
         surface: "asphalt",
+        lengthFt: 12197,
       },
       {
         id: "8R/26L",
@@ -440,6 +462,7 @@ const AIRPORTS: Record<string, AirportData> = {
         length: 300, width: 14,
         angle: 80,
         surface: "asphalt",
+        lengthFt: 10200,
       },
     ],
     taxiways: [
@@ -614,6 +637,19 @@ const RunwaySvg = ({ runway, index }: { runway: RunwayData; index: number }) => 
       <text x={lx2} y={ly2} fill="hsl(0 0% 92%)" fontSize="9" fontFamily="Share Tech Mono" textAnchor="middle" dominantBaseline="central">
         {runway.headings[1]}
       </text>
+
+      {/* Runway length label (in feet) centered on runway */}
+      <text
+        x={runway.cx + Math.sin(rad) * (runway.width / 2 + 7)}
+        y={runway.cy - Math.cos(rad) * (runway.width / 2 + 7)}
+        fill="hsl(190 80% 70%)"
+        fontSize="5.5"
+        fontFamily="Share Tech Mono"
+        textAnchor="middle"
+        dominantBaseline="central"
+        transform={`rotate(${runway.angle - 90}, ${runway.cx + Math.sin(rad) * (runway.width / 2 + 7)}, ${runway.cy - Math.cos(rad) * (runway.width / 2 + 7)})`}
+        opacity={0.9}
+      >{runway.lengthFt.toLocaleString()}&apos;</text>
     </g>
   );
 };
