@@ -9,7 +9,7 @@ echo.
 
 REM Step 1: Install dependencies (if needed)
 echo [1/5] Installing dependencies...
-call npm install
+call npm install --legacy-peer-deps
 if errorlevel 1 (
     echo ERROR: npm install failed
     pause
