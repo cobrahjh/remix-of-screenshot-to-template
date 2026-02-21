@@ -1223,11 +1223,11 @@ export const SafeTaxiScreen = () => {
 
       {/* Airport info strip */}
       <div className="flex items-center justify-between px-3 py-1 border-b border-avionics-divider/50 bg-avionics-panel">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="font-mono text-[9px] text-avionics-white">{airport.name}</span>
           <button
             onClick={() => setShowTaxiRoute(!showTaxiRoute)}
-            className={`font-mono text-[7px] px-1.5 py-0.5 rounded border transition-colors ${
+            className={`font-mono text-[7px] px-1.5 py-0.5 rounded border transition-colors flex items-center gap-0.5 ${
               showTaxiRoute
                 ? "border-purple-500 text-purple-300 bg-purple-500/20"
                 : "border-avionics-divider text-avionics-label hover:text-avionics-white"
@@ -1239,7 +1239,7 @@ export const SafeTaxiScreen = () => {
           <div className="relative">
             <button
               onClick={() => setShowAircraftPicker(!showAircraftPicker)}
-              className="font-mono text-[7px] px-1.5 py-0.5 rounded border border-avionics-cyan/40 text-avionics-cyan hover:bg-avionics-button transition-colors"
+              className="font-mono text-[7px] px-1.5 py-0.5 rounded border border-avionics-cyan/40 text-avionics-cyan hover:bg-avionics-button transition-colors flex items-center gap-0.5"
             >
               <Plane className="w-2.5 h-2.5 inline-block mr-0.5" />
               {aircraft.shortName}
