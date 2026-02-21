@@ -103,7 +103,7 @@ const GtnDisplay = () => {
       <div className={`border-b border-avionics-divider px-3 py-1 flex items-center justify-between ${smartGlideActive ? "bg-destructive/20" : "bg-avionics-panel"}`}>
         <div className="flex items-center gap-1.5">
           <img src={simglassLogo} alt="SimGlass logo" className="w-5 h-5 rounded-sm" />
-          <span className="font-body text-[10px] text-avionics-label tracking-[0.3em] uppercase font-semibold">
+          <span className="font-body text-[13px] text-avionics-label tracking-[0.3em] uppercase font-semibold">
             {smartGlideActive ? "⚠ EMERGENCY" : "SIMGLASS AVIONICS"}
           </span>
         </div>
