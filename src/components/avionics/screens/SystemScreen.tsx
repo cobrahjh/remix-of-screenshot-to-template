@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useFlightData, ConnectionMode } from "../FlightDataContext";
-import { Wifi, WifiOff, TestTube2, Check, Save, Trash2, PenLine, Plus } from "lucide-react";
+import { Wifi, WifiOff, TestTube2, Check, Save, Trash2, PenLine, Plus, Sun, Moon } from "lucide-react";
 
 type Tab = "conn" | "setup" | "gps" | "units" | "database" | "backlight";
 
@@ -418,10 +418,25 @@ const DisplayTab = () => {
   const [activeSchemeId, setActiveSchemeId] = useState(() =>
     localStorage.getItem("avionics-color-scheme") || "default"
   );
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem("avionics-display-mode");
+    return saved !== "light";
+  });
   const [editing, setEditing] = useState(false);
   const [editVars, setEditVars] = useState<Record<string, string>>({});
   const [editName, setEditName] = useState("");
   const [brightness, setBrightness] = useState(100);
+
+  // Apply dark/light mode
+  useEffect(() => {
+    const root = document.documentElement;
+    if (darkMode) {
+      root.classList.remove("light");
+    } else {
+      root.classList.add("light");
+    }
+    localStorage.setItem("avionics-display-mode", darkMode ? "dark" : "light");
+  }, [darkMode]);
 
   const applyVars = useCallback((vars: Record<string, string>) => {
     const root = document.documentElement;
@@ -558,6 +573,33 @@ const DisplayTab = () => {
         <div className="mt-2">
           <SettingRow label="Auto Brightness" value="On" color="text-avionics-green" />
           <SettingRow label="Night Mode" value="Off" />
+        </div>
+      </div>
+
+      {/* Dark / Light Mode Toggle */}
+      <div className="px-3 py-2 border-b border-avionics-divider">
+        <div className="flex items-center justify-between">
+          <span className="font-mono text-[9px] text-avionics-amber">DISPLAY MODE</span>
+          <button
+            onClick={() => setDarkMode((prev) => !prev)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded border transition-all ${
+              darkMode
+                ? "border-avionics-cyan/40 bg-avionics-button"
+                : "border-avionics-amber/40 bg-avionics-button"
+            }`}
+          >
+            {darkMode ? (
+              <>
+                <Moon className="w-3 h-3 text-avionics-cyan" />
+                <span className="font-mono text-[9px] text-avionics-cyan">DARK</span>
+              </>
+            ) : (
+              <>
+                <Sun className="w-3 h-3 text-avionics-amber" />
+                <span className="font-mono text-[9px] text-avionics-amber">LIGHT</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 
