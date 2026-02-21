@@ -1,3 +1,4 @@
+import simglassLogo from "@/assets/simglass-logo.png";
 import { GtnProvider, useGtn } from "@/components/avionics/GtnContext";
 import { FlightDataProvider } from "@/components/avionics/FlightDataContext";
 import { TopBar } from "@/components/avionics/TopBar";
@@ -100,9 +101,12 @@ const GtnDisplay = () => {
     <div className="w-full max-w-md rounded-xl overflow-hidden avionics-bezel border-2 border-avionics-divider bg-avionics-panel-dark flex flex-col" style={{ height: "min(85vh, 680px)" }}>
       {/* Header */}
       <div className={`border-b border-avionics-divider px-3 py-1 flex items-center justify-between ${smartGlideActive ? "bg-destructive/20" : "bg-avionics-panel"}`}>
-        <span className="font-body text-[10px] text-avionics-label tracking-[0.3em] uppercase font-semibold">
-          {smartGlideActive ? "⚠ EMERGENCY" : "SIMGLASS AVIONICS"}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <img src={simglassLogo} alt="SimGlass logo" className="w-5 h-5 rounded-sm" />
+          <span className="font-body text-[10px] text-avionics-label tracking-[0.3em] uppercase font-semibold">
+            {smartGlideActive ? "⚠ EMERGENCY" : "SIMGLASS AVIONICS"}
+          </span>
+        </div>
         <div className="flex items-center gap-2">
           {directToTarget && (
             <span className="font-mono text-[9px] text-avionics-magenta">D→ {directToTarget}</span>
