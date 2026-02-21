@@ -1,6 +1,6 @@
 import { useGtn, FlightPlanWaypoint } from "../GtnContext";
 import { useState, useMemo, useRef, useCallback } from "react";
-import { Upload, Download, FileText, X, AlertTriangle } from "lucide-react";
+import { Upload, Download, FileText, X, AlertTriangle, Plane } from "lucide-react";
 
 /* ─── Flight Plan Parsers ─── */
 
@@ -113,12 +113,55 @@ function bearingDeg(lat1: number, lng1: number, lat2: number, lng2: number) {
   return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
 }
 
+/** Fetch and parse SimBrief OFP */
+async function fetchSimBrief(pilotId: string): Promise<FlightPlanWaypoint[] | null> {
+  try {
+    const res = await fetch(`https://www.simbrief.com/api/xml.fetcher.php?username=${encodeURIComponent(pilotId)}&json=1`);
+    if (!res.ok) return null;
+    const data = await res.json();
+
+    const navlog = data?.navlog?.fix;
+    if (!Array.isArray(navlog) || navlog.length < 2) return null;
+
+    const waypoints: FlightPlanWaypoint[] = navlog.map((fix: any, i: number) => {
+      const ident = fix.ident || `WP${i}`;
+      const lat = parseFloat(fix.pos_lat) || 0;
+      const lng = parseFloat(fix.pos_long) || 0;
+      const alt = parseInt(fix.altitude_feet) || 0;
+      const rawType = (fix.type || "").toUpperCase();
+      let type: FlightPlanWaypoint["type"] = "fix";
+      if (rawType.includes("APT") || rawType === "AIRPORT") type = "airport";
+      else if (rawType.includes("VOR")) type = "vor";
+      else if (rawType.includes("NDB")) type = "ndb";
+
+      return {
+        id: String(i + 1),
+        name: ident,
+        type,
+        dtk: 0,
+        dis: 0,
+        alt,
+        ete: "00:00",
+        lat,
+        lng,
+      };
+    });
+
+    return computeLegs(waypoints);
+  } catch {
+    return null;
+  }
+}
+
 /* ─── Import Dialog ─── */
 const ImportDialog = ({ onImport, onClose }: { onImport: (plan: FlightPlanWaypoint[]) => void; onClose: () => void }) => {
-  const [tab, setTab] = useState<"file" | "text">("file");
+  const [tab, setTab] = useState<"file" | "text" | "simbrief">("file");
   const [textInput, setTextInput] = useState("");
+  const [simbriefId, setSimbriefId] = useState(() => localStorage.getItem("simbrief_pilot_id") || "");
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<FlightPlanWaypoint[] | null>(null);
+  const [simbriefMeta, setSimbriefMeta] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -139,7 +182,6 @@ const ImportDialog = ({ onImport, onClose }: { onImport: (plan: FlightPlanWaypoi
         plan = parseTextPlan(content);
         if (!plan) setError("Need at least 2 waypoints, one per line.");
       } else {
-        // Try both parsers
         plan = parseGarminFpl(content) || parseTextPlan(content);
         if (!plan) setError("Unrecognized file format.");
       }
@@ -159,12 +201,42 @@ const ImportDialog = ({ onImport, onClose }: { onImport: (plan: FlightPlanWaypoi
     }
   };
 
+  const handleSimbriefFetch = async () => {
+    if (!simbriefId.trim()) {
+      setError("Enter your SimBrief Pilot ID or username.");
+      return;
+    }
+    setError(null);
+    setPreview(null);
+    setSimbriefMeta(null);
+    setLoading(true);
+    try {
+      localStorage.setItem("simbrief_pilot_id", simbriefId.trim());
+      const plan = await fetchSimBrief(simbriefId.trim());
+      if (plan) {
+        setPreview(plan);
+        setSimbriefMeta(`${plan[0]?.name} → ${plan[plan.length - 1]?.name}`);
+      } else {
+        setError("No flight plan found. Check your Pilot ID and ensure you have a recent OFP generated.");
+      }
+    } catch {
+      setError("Failed to connect to SimBrief.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleConfirm = () => {
     if (preview) {
       onImport(preview);
       onClose();
     }
   };
+
+  const tabClass = (t: string) =>
+    `flex-1 py-1.5 text-center font-mono text-[10px] transition-colors ${
+      tab === t ? "text-avionics-cyan bg-avionics-button-active border-b-2 border-avionics-cyan" : "text-avionics-label hover:bg-avionics-button-hover"
+    }`;
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-avionics-panel-dark/95 backdrop-blur-sm">
@@ -181,22 +253,9 @@ const ImportDialog = ({ onImport, onClose }: { onImport: (plan: FlightPlanWaypoi
 
       {/* Tab bar */}
       <div className="flex border-b border-avionics-divider">
-        <button
-          onClick={() => { setTab("file"); setError(null); setPreview(null); }}
-          className={`flex-1 py-1.5 text-center font-mono text-[10px] transition-colors ${
-            tab === "file" ? "text-avionics-cyan bg-avionics-button-active border-b-2 border-avionics-cyan" : "text-avionics-label hover:bg-avionics-button-hover"
-          }`}
-        >
-          FILE
-        </button>
-        <button
-          onClick={() => { setTab("text"); setError(null); setPreview(null); }}
-          className={`flex-1 py-1.5 text-center font-mono text-[10px] transition-colors ${
-            tab === "text" ? "text-avionics-cyan bg-avionics-button-active border-b-2 border-avionics-cyan" : "text-avionics-label hover:bg-avionics-button-hover"
-          }`}
-        >
-          TEXT
-        </button>
+        <button onClick={() => { setTab("file"); setError(null); setPreview(null); }} className={tabClass("file")}>FILE</button>
+        <button onClick={() => { setTab("text"); setError(null); setPreview(null); }} className={tabClass("text")}>TEXT</button>
+        <button onClick={() => { setTab("simbrief"); setError(null); setPreview(null); }} className={tabClass("simbrief")}>SIMBRIEF</button>
       </div>
 
       {/* Content */}
@@ -240,6 +299,35 @@ const ImportDialog = ({ onImport, onClose }: { onImport: (plan: FlightPlanWaypoi
           </div>
         )}
 
+        {tab === "simbrief" && !preview && (
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2 text-[9px] text-avionics-label font-mono leading-relaxed">
+              <Plane className="w-4 h-4 text-avionics-green shrink-0" />
+              <span>Fetch your latest OFP from SimBrief. Enter your Pilot ID or username.</span>
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={simbriefId}
+                onChange={e => setSimbriefId(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleSimbriefFetch()}
+                placeholder="Pilot ID or username"
+                className="flex-1 px-2 py-1.5 bg-avionics-inset text-avionics-white font-mono text-[10px] rounded border border-avionics-divider focus:border-avionics-cyan outline-none"
+              />
+              <button
+                onClick={handleSimbriefFetch}
+                disabled={loading}
+                className="px-3 py-1.5 bg-avionics-button hover:bg-avionics-button-hover rounded avionics-bezel font-mono text-[10px] text-avionics-green transition-colors disabled:opacity-50"
+              >
+                {loading ? "..." : "Fetch"}
+              </button>
+            </div>
+            <div className="text-[8px] text-avionics-label/60 font-mono">
+              Find your Pilot ID at simbrief.com → Account Settings
+            </div>
+          </div>
+        )}
+
         {/* Error */}
         {error && (
           <div className="flex items-center gap-2 mt-2 px-2 py-1.5 rounded bg-destructive/10 border border-destructive/30">
@@ -252,7 +340,7 @@ const ImportDialog = ({ onImport, onClose }: { onImport: (plan: FlightPlanWaypoi
         {preview && (
           <div className="flex flex-col gap-2">
             <div className="text-[9px] text-avionics-green font-mono">
-              ✓ {preview.length} waypoints parsed
+              ✓ {preview.length} waypoints parsed{simbriefMeta ? ` • ${simbriefMeta}` : ""}
             </div>
             <div className="border border-avionics-divider rounded overflow-hidden">
               <div className="flex items-center px-2 py-1 bg-avionics-panel/50 border-b border-avionics-divider/50 gap-2">
