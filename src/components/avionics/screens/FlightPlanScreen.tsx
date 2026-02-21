@@ -1,6 +1,6 @@
 import { useGtn, FlightPlanWaypoint } from "../GtnContext";
 import { useState, useMemo, useRef, useCallback } from "react";
-import { Upload, FileText, X, AlertTriangle } from "lucide-react";
+import { Upload, Download, FileText, X, AlertTriangle } from "lucide-react";
 
 /* ─── Flight Plan Parsers ─── */
 
@@ -299,6 +299,58 @@ const ImportDialog = ({ onImport, onClose }: { onImport: (plan: FlightPlanWaypoi
   );
 };
 
+/* ─── Flight Plan Export ─── */
+
+function exportGarminFpl(flightPlan: FlightPlanWaypoint[]) {
+  const typeMap: Record<string, string> = {
+    airport: "AIRPORT", vor: "VOR", ndb: "NDB", fix: "INT", user: "USER WAYPOINT",
+  };
+
+  const wpTableXml = flightPlan.map(wp =>
+    `    <waypoint>
+      <identifier>${wp.name}</identifier>
+      <type>${typeMap[wp.type] || "INT"}</type>
+      <country-code></country-code>
+      <lat>${wp.lat.toFixed(6)}</lat>
+      <lon>${wp.lng.toFixed(6)}</lon>
+      <comment></comment>
+    </waypoint>`
+  ).join("\n");
+
+  const routePointsXml = flightPlan.map(wp =>
+    `      <route-point>
+        <waypoint-identifier>${wp.name}</waypoint-identifier>
+        <waypoint-type>${typeMap[wp.type] || "INT"}</waypoint-type>
+        <waypoint-country-code></waypoint-country-code>
+      </route-point>`
+  ).join("\n");
+
+  const routeName = `${flightPlan[0]?.name || "ORIG"} - ${flightPlan[flightPlan.length - 1]?.name || "DEST"}`;
+
+  const xml = `<?xml version="1.0" encoding="utf-8"?>
+<flight-plan xmlns="http://www8.garmin.com/xmlschemas/FlightPlan/v1">
+  <created>${new Date().toISOString()}</created>
+  <waypoint-table>
+${wpTableXml}
+  </waypoint-table>
+  <route>
+    <route-name>${routeName}</route-name>
+    <route-description>Exported from SimGlass Avionics</route-description>
+${routePointsXml}
+  </route>
+</flight-plan>`;
+
+  const blob = new Blob([xml], { type: "application/xml" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${flightPlan[0]?.name || "FPL"}_${flightPlan[flightPlan.length - 1]?.name || "DEST"}.fpl`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 /* ─── Existing Components ─── */
 
 const WaypointIcon = ({ type }: { type: FlightPlanWaypoint["type"] }) => {
@@ -475,6 +527,13 @@ export const FlightPlanScreen = () => {
           >
             <Upload className="w-3 h-3" />
             IMPORT
+          </button>
+          <button
+            onClick={() => exportGarminFpl(flightPlan)}
+            className="px-2 py-0.5 rounded text-[8px] font-mono avionics-bezel bg-avionics-button text-avionics-green hover:bg-avionics-button-hover transition-colors flex items-center gap-1"
+          >
+            <Download className="w-3 h-3" />
+            EXPORT
           </button>
         </div>
         <div className="flex items-center gap-3">
