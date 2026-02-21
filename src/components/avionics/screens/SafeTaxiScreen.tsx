@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useFlightData } from "../FlightDataContext";
-import { PlaneTakeoff, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
+import { PlaneTakeoff, AlertTriangle, ChevronDown, ChevronUp, Wind } from "lucide-react";
 
 interface RunwayData {
   id: string;
@@ -727,6 +727,39 @@ const NOTAMS: Record<string, NotamEntry[]> = {
   ],
 };
 
+// Simulated wind data per airport (direction in degrees true, speed in knots, gusts optional)
+const WINDS: Record<string, { direction: number; speed: number; gust?: number }> = {
+  KMRY: { direction: 280, speed: 12, gust: 18 },
+  KSNS: { direction: 310, speed: 8 },
+  KSJC: { direction: 300, speed: 14, gust: 22 },
+  KSFO: { direction: 270, speed: 18, gust: 28 },
+  KOAK: { direction: 290, speed: 10 },
+  KLAX: { direction: 250, speed: 8 },
+  KSAN: { direction: 270, speed: 6 },
+  KBUR: { direction: 260, speed: 11, gust: 16 },
+  KONT: { direction: 260, speed: 9 },
+};
+
+// Determine which runway heading is preferred given wind direction
+const getPreferredRunways = (runways: RunwayData[], windDir: number): Set<string> => {
+  const preferred = new Set<string>();
+  for (const rw of runways) {
+    // Each runway has two headings; compute which end has better headwind
+    const hdg0 = parseInt(rw.headings[0].replace(/[LRC]/g, "")) * 10;
+    const hdg1 = parseInt(rw.headings[1].replace(/[LRC]/g, "")) * 10;
+    // Headwind component: cos of angle between wind FROM direction and runway heading
+    const hw0 = Math.cos(((windDir - hdg0) * Math.PI) / 180);
+    const hw1 = Math.cos(((windDir - hdg1) * Math.PI) / 180);
+    // The end with greater headwind component is preferred
+    if (hw0 >= hw1) {
+      preferred.add(rw.headings[0]);
+    } else {
+      preferred.add(rw.headings[1]);
+    }
+  }
+  return preferred;
+};
+
 export const SafeTaxiScreen = () => {
   const { flight } = useFlightData();
   const [selectedAirport, setSelectedAirport] = useState<string>("KMRY");
@@ -734,6 +767,12 @@ export const SafeTaxiScreen = () => {
 
   const airport = AIRPORTS[selectedAirport];
   const notams = NOTAMS[selectedAirport] || [];
+  const wind = WINDS[selectedAirport] || { direction: 0, speed: 0 };
+
+  const preferredRunways = useMemo(
+    () => getPreferredRunways(airport.runways, wind.direction),
+    [airport.runways, wind.direction]
+  );
 
   // Simple position mapping: place aircraft near a runway if close
   const ownshipX = 200;
@@ -768,7 +807,12 @@ export const SafeTaxiScreen = () => {
       <div className="flex items-center justify-between px-3 py-1 border-b border-avionics-divider/50 bg-avionics-panel">
         <span className="font-mono text-[9px] text-avionics-white">{airport.name}</span>
         <div className="flex items-center gap-3">
-          <span className="font-mono text-[8px] text-avionics-label">ELEV <span className="text-avionics-amber">{airport.elevation}</span> FT</span>
+          <span className="font-mono text-[8px] text-avionics-label">
+            <Wind className="w-2.5 h-2.5 inline-block mr-0.5 text-avionics-green" />
+            <span className="text-avionics-green">{String(wind.direction).padStart(3, "0")}°/{wind.speed}KT</span>
+            {wind.gust && <span className="text-avionics-amber">G{wind.gust}</span>}
+          </span>
+          <span className="font-mono text-[8px] text-avionics-label">ELEV <span className="text-avionics-amber">{airport.elevation}</span></span>
           <span className="font-mono text-[8px] text-avionics-label">TWR <span className="text-avionics-green">{airport.towerFreq}</span></span>
           <span className="font-mono text-[8px] text-avionics-label">ATIS <span className="text-avionics-cyan">{airport.atisFreq}</span></span>
         </div>
@@ -931,6 +975,61 @@ export const SafeTaxiScreen = () => {
             <text x={0} y={-15} fill="hsl(0 0% 92%)" fontSize="7" fontFamily="Share Tech Mono" textAnchor="middle">N</text>
           </g>
 
+          {/* Wind direction indicator / wind sock */}
+          <g transform={`translate(370,65)`}>
+            {/* Wind circle */}
+            <circle cx={0} cy={0} r={14} fill="hsl(220 20% 8%)" stroke="hsl(160 80% 40%)" strokeWidth={0.8} opacity={0.9} />
+            {/* Wind arrow pointing in the direction wind is COMING FROM */}
+            <g transform={`rotate(${wind.direction})`}>
+              <line x1={0} y1={-12} x2={0} y2={6} stroke="hsl(160 100% 50%)" strokeWidth={1.5} />
+              <polygon points="0,-12 -3,-7 3,-7" fill="hsl(160 100% 50%)" />
+              {/* Wind barbs for speed */}
+              {wind.speed >= 5 && <line x1={0} y1={4} x2={5} y2={1} stroke="hsl(160 100% 50%)" strokeWidth={1} />}
+              {wind.speed >= 10 && <line x1={0} y1={1} x2={5} y2={-2} stroke="hsl(160 100% 50%)" strokeWidth={1} />}
+              {wind.speed >= 15 && <line x1={0} y1={-2} x2={5} y2={-5} stroke="hsl(160 100% 50%)" strokeWidth={1} />}
+            </g>
+            <text x={0} y={22} fill="hsl(160 100% 50%)" fontSize="5.5" fontFamily="Share Tech Mono" textAnchor="middle">
+              {String(wind.direction).padStart(3, "0")}°
+            </text>
+            <text x={0} y={28} fill="hsl(160 100% 50%)" fontSize="5" fontFamily="Share Tech Mono" textAnchor="middle">
+              {wind.speed}KT{wind.gust ? `G${wind.gust}` : ""}
+            </text>
+          </g>
+
+          {/* Preferred runway arrows — green arrow at the landing end */}
+          {airport.runways.map((rw, i) => {
+            const rad = (rw.angle - 90) * (Math.PI / 180);
+            const halfLen = rw.length / 2;
+            const x1 = rw.cx - halfLen * Math.cos(rad);
+            const y1 = rw.cy - halfLen * Math.sin(rad);
+            const x2 = rw.cx + halfLen * Math.cos(rad);
+            const y2 = rw.cy + halfLen * Math.sin(rad);
+            const arrowSize = 6;
+            return (
+              <g key={`pref-${i}`}>
+                {preferredRunways.has(rw.headings[0]) && (
+                  <g>
+                    {/* Arrow pointing toward heading[0] approach end — landing this direction */}
+                    <polygon
+                      points={`${x1 - arrowSize * Math.cos(rad) - arrowSize * 0.5 * Math.sin(rad)},${y1 - arrowSize * Math.sin(rad) + arrowSize * 0.5 * Math.cos(rad)} ${x1 - arrowSize * Math.cos(rad) + arrowSize * 0.5 * Math.sin(rad)},${y1 - arrowSize * Math.sin(rad) - arrowSize * 0.5 * Math.cos(rad)} ${x1},${y1}`}
+                      fill="hsl(160 100% 45%)"
+                      opacity={0.8}
+                    />
+                  </g>
+                )}
+                {preferredRunways.has(rw.headings[1]) && (
+                  <g>
+                    <polygon
+                      points={`${x2 + arrowSize * Math.cos(rad) - arrowSize * 0.5 * Math.sin(rad)},${y2 + arrowSize * Math.sin(rad) + arrowSize * 0.5 * Math.cos(rad)} ${x2 + arrowSize * Math.cos(rad) + arrowSize * 0.5 * Math.sin(rad)},${y2 + arrowSize * Math.sin(rad) - arrowSize * 0.5 * Math.cos(rad)} ${x2},${y2}`}
+                      fill="hsl(160 100% 45%)"
+                      opacity={0.8}
+                    />
+                  </g>
+                )}
+              </g>
+            );
+          })}
+
           {/* Scale bar */}
           <g transform="translate(20,330)">
             <line x1={0} y1={0} x2={50} y2={0} stroke="hsl(0 0% 60%)" strokeWidth={1} />
@@ -941,15 +1040,27 @@ export const SafeTaxiScreen = () => {
         </svg>
       </div>
 
-      {/* Runway info strip */}
+      {/* Runway info strip with preferred runway highlighting */}
       <div className="border-t border-avionics-divider bg-avionics-panel px-3 py-1.5">
         <div className="flex items-center gap-3 overflow-x-auto">
-          {airport.runways.map((rw) => (
-            <div key={rw.id} className="flex items-center gap-2 shrink-0">
-              <span className="font-mono text-[9px] text-avionics-white">{rw.id}</span>
-              <span className="font-mono text-[8px] text-avionics-label">{rw.surface.toUpperCase()}</span>
-            </div>
-          ))}
+          {airport.runways.map((rw) => {
+            const pref0 = preferredRunways.has(rw.headings[0]);
+            const pref1 = preferredRunways.has(rw.headings[1]);
+            return (
+              <div key={rw.id} className="flex items-center gap-1.5 shrink-0">
+                <span className={`font-mono text-[9px] ${pref0 ? "text-avionics-green" : "text-avionics-label"}`}>
+                  {rw.headings[0]}
+                  {pref0 && " ▸"}
+                </span>
+                <span className="font-mono text-[8px] text-avionics-label">/</span>
+                <span className={`font-mono text-[9px] ${pref1 ? "text-avionics-green" : "text-avionics-label"}`}>
+                  {pref1 && "◂ "}
+                  {rw.headings[1]}
+                </span>
+                <span className="font-mono text-[7px] text-avionics-label">{rw.surface.toUpperCase()}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
 
