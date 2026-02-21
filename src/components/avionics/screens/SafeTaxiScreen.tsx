@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useFlightData } from "../FlightDataContext";
-import { PlaneTakeoff, AlertTriangle, ChevronDown, ChevronUp, Wind, Radio } from "lucide-react";
+import { PlaneTakeoff, AlertTriangle, ChevronDown, ChevronUp, Wind, Radio, Navigation } from "lucide-react";
 
 interface RunwayData {
   id: string;
@@ -901,11 +901,78 @@ const getPreferredRunways = (runways: RunwayData[], windDir: number): Set<string
   return preferred;
 };
 
+// Simulated taxi routes from ownship position to runway thresholds
+const TAXI_ROUTES: Record<string, Record<string, { path: [number, number][]; taxiways: string[] }>> = {
+  KMRY: {
+    "28L": { path: [[200,240],[200,220],[140,220],[140,200],[140,185],[200,185],[200,160]], taxiways: ["E","A","C"] },
+    "28R": { path: [[200,240],[200,220],[140,220],[140,200]], taxiways: ["E","A","C"] },
+    "10R": { path: [[200,240],[200,220],[260,220],[260,185],[340,185],[340,160]], taxiways: ["E","A","D","F"] },
+    "10L": { path: [[200,240],[200,220],[260,220],[260,200]], taxiways: ["E","A","D"] },
+  },
+  KSNS: {
+    "26": { path: [[200,240],[140,240],[140,200],[140,170],[250,170],[320,170],[320,150]], taxiways: ["D","A","C"] },
+    "08": { path: [[200,240],[140,240],[140,200],[140,170],[80,170],[80,150]], taxiways: ["D","A"] },
+    "32": { path: [[200,240],[140,240],[140,200]], taxiways: ["D"] },
+    "14": { path: [[200,240],[140,240],[140,200],[170,200],[250,200]], taxiways: ["D","B"] },
+  },
+  KSJC: {
+    "30R": { path: [[200,240],[200,260],[100,260],[100,200],[150,200],[150,160]], taxiways: ["Z","A","C"] },
+    "30L": { path: [[200,240],[200,260],[100,260],[100,200],[210,200],[210,160]], taxiways: ["Z","A","D"] },
+    "12L": { path: [[200,240],[200,260],[100,260],[100,200],[80,200],[80,160]], taxiways: ["Z","A","B"] },
+    "12R": { path: [[200,240],[200,260],[100,260],[100,200],[270,200],[270,160]], taxiways: ["Z","A","E"] },
+  },
+  KSFO: {
+    "28L": { path: [[200,240],[180,240],[180,190],[80,190],[80,175],[80,120]], taxiways: ["A","B"] },
+    "28R": { path: [[200,240],[180,240],[180,190],[160,190],[160,175],[160,160]], taxiways: ["A","C"] },
+    "10R": { path: [[200,240],[180,240],[180,190],[320,190],[320,175],[320,120]], taxiways: ["A","E"] },
+    "10L": { path: [[200,240],[180,240],[180,190],[240,190],[240,175],[240,160]], taxiways: ["A","D"] },
+    "01L": { path: [[200,240],[270,240],[270,190],[280,190],[280,210],[300,210],[300,230]], taxiways: ["A","F"] },
+    "19R": { path: [[200,240],[270,240],[270,190],[280,190],[280,210],[300,210],[300,230]], taxiways: ["A","F"] },
+    "01R": { path: [[200,240],[340,240],[340,190],[340,175],[340,210],[340,230]], taxiways: ["A","K"] },
+    "19L": { path: [[200,240],[340,240],[340,190],[340,175],[340,210],[340,230]], taxiways: ["A","K"] },
+  },
+  KOAK: {
+    "30": { path: [[200,240],[100,240],[100,220],[100,195],[180,195],[180,160]], taxiways: ["W","A","C"] },
+    "12": { path: [[200,240],[100,240],[100,220],[100,195],[300,195],[300,160]], taxiways: ["W","A","E"] },
+    "28R": { path: [[200,240],[200,220]], taxiways: ["C"] },
+    "10L": { path: [[200,240],[200,220]], taxiways: ["C"] },
+    "28L": { path: [[200,240],[200,260]], taxiways: ["W"] },
+    "10R": { path: [[200,240],[200,260]], taxiways: ["W"] },
+  },
+  KLAX: {
+    "24R": { path: [[200,240],[130,240],[130,195],[120,195],[120,145],[120,100]], taxiways: ["C","S","E"] },
+    "24L": { path: [[200,240],[130,240],[130,195],[200,195],[200,145],[200,100]], taxiways: ["C","S","T"] },
+    "06L": { path: [[200,240],[130,240],[130,195],[280,195],[280,145],[280,100]], taxiways: ["C","S","B"] },
+    "06R": { path: [[200,240],[130,240],[130,195],[200,195],[200,145]], taxiways: ["C","S","T"] },
+    "25R": { path: [[200,240]], taxiways: ["K"] },
+    "25L": { path: [[200,240],[200,285]], taxiways: ["P"] },
+    "07L": { path: [[200,240]], taxiways: ["K"] },
+    "07R": { path: [[200,240],[200,285]], taxiways: ["P"] },
+  },
+  KSAN: {
+    "27": { path: [[200,240],[200,230],[80,230],[80,185],[120,185],[120,160]], taxiways: ["G","A","B"] },
+    "09": { path: [[200,240],[200,230],[330,230],[330,185],[280,185],[280,160]], taxiways: ["F","A","E"] },
+  },
+  KBUR: {
+    "26": { path: [[200,240],[160,240],[160,220],[160,165],[200,165],[200,140]], taxiways: ["E","A","C"] },
+    "08": { path: [[200,240],[160,240],[160,220],[160,165],[120,165],[120,140]], taxiways: ["E","A","B"] },
+    "33": { path: [[200,240],[160,240],[160,220],[160,165],[310,165],[310,190]], taxiways: ["E","A","G"] },
+    "15": { path: [[200,240],[160,240],[160,220],[160,165],[310,165],[310,190]], taxiways: ["E","A","G"] },
+  },
+  KONT: {
+    "26R": { path: [[200,240],[200,235],[200,195],[200,155],[200,130]], taxiways: ["D"] },
+    "08L": { path: [[200,240],[200,235],[200,195],[200,155],[200,130]], taxiways: ["D"] },
+    "26L": { path: [[200,240],[200,260]], taxiways: ["D"] },
+    "08R": { path: [[200,240],[200,260]], taxiways: ["D"] },
+  },
+};
+
 export const SafeTaxiScreen = () => {
   const { flight } = useFlightData();
   const [selectedAirport, setSelectedAirport] = useState<string>("KMRY");
   const [notamsOpen, setNotamsOpen] = useState(false);
   const [atisOpen, setAtisOpen] = useState(false);
+  const [showTaxiRoute, setShowTaxiRoute] = useState(true);
 
   const airport = AIRPORTS[selectedAirport];
   const notams = NOTAMS[selectedAirport] || [];
@@ -916,6 +983,21 @@ export const SafeTaxiScreen = () => {
     () => getPreferredRunways(airport.runways, wind.direction),
     [airport.runways, wind.direction]
   );
+
+  // Get the active taxi route for the first preferred runway
+  const activeTaxiRoute = useMemo(() => {
+    const routes = TAXI_ROUTES[selectedAirport];
+    if (!routes) return null;
+    // Find first preferred runway that has a route
+    for (const rw of airport.runways) {
+      for (const hdg of rw.headings) {
+        if (preferredRunways.has(hdg) && routes[hdg]) {
+          return { ...routes[hdg], runway: hdg };
+        }
+      }
+    }
+    return null;
+  }, [selectedAirport, airport.runways, preferredRunways]);
 
   // Simple position mapping: place aircraft near a runway if close
   const ownshipX = 200;
@@ -948,7 +1030,20 @@ export const SafeTaxiScreen = () => {
 
       {/* Airport info strip */}
       <div className="flex items-center justify-between px-3 py-1 border-b border-avionics-divider/50 bg-avionics-panel">
-        <span className="font-mono text-[9px] text-avionics-white">{airport.name}</span>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[9px] text-avionics-white">{airport.name}</span>
+          <button
+            onClick={() => setShowTaxiRoute(!showTaxiRoute)}
+            className={`font-mono text-[7px] px-1.5 py-0.5 rounded border transition-colors ${
+              showTaxiRoute
+                ? "border-purple-500 text-purple-300 bg-purple-500/20"
+                : "border-avionics-divider text-avionics-label hover:text-avionics-white"
+            }`}
+          >
+            <Navigation className="w-2.5 h-2.5 inline-block mr-0.5" />
+            TAXI RTE
+          </button>
+        </div>
         <div className="flex items-center gap-3">
           <span className="font-mono text-[8px] text-avionics-label">
             <Wind className="w-2.5 h-2.5 inline-block mr-0.5 text-avionics-green" />
@@ -960,6 +1055,17 @@ export const SafeTaxiScreen = () => {
           <span className="font-mono text-[8px] text-avionics-label">ATIS <span className="text-avionics-cyan">{airport.atisFreq}</span></span>
         </div>
       </div>
+
+      {/* Taxi clearance strip */}
+      {showTaxiRoute && activeTaxiRoute && (
+        <div className="flex items-center gap-2 px-3 py-1 border-b border-purple-500/30 bg-purple-950/30">
+          <Navigation className="w-3 h-3 text-purple-400" />
+          <span className="font-mono text-[8px] text-purple-300">TAXI TO RWY</span>
+          <span className="font-mono text-[9px] text-purple-200 font-bold">{activeTaxiRoute.runway}</span>
+          <span className="font-mono text-[8px] text-purple-400">VIA</span>
+          <span className="font-mono text-[9px] text-purple-200">{activeTaxiRoute.taxiways.join(" · ")}</span>
+        </div>
+      )}
 
       {/* NOTAM alerts */}
       <div className="border-b border-avionics-divider/50">
@@ -1168,6 +1274,65 @@ export const SafeTaxiScreen = () => {
             <animate attributeName="opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite" />
           </circle>
           <text x={airport.beacon.x} y={airport.beacon.y - 8} fill="hsl(160 100% 45%)" fontSize="6" fontFamily="Share Tech Mono" textAnchor="middle">BCN</text>
+
+          {/* Taxi route highlighting */}
+          {showTaxiRoute && activeTaxiRoute && activeTaxiRoute.path.length > 1 && (
+            <g>
+              {/* Glow under the route */}
+              <polyline
+                points={activeTaxiRoute.path.map(p => p.join(",")).join(" ")}
+                fill="none"
+                stroke="hsl(280 100% 65%)"
+                strokeWidth={8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={0.15}
+              />
+              {/* Animated dashed route line */}
+              <polyline
+                points={activeTaxiRoute.path.map(p => p.join(",")).join(" ")}
+                fill="none"
+                stroke="hsl(280 100% 65%)"
+                strokeWidth={3}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeDasharray="8 5"
+                opacity={0.9}
+              >
+                <animate attributeName="stroke-dashoffset" values="0;-26" dur="1.5s" repeatCount="indefinite" />
+              </polyline>
+              {/* Waypoint dots */}
+              {activeTaxiRoute.path.slice(1, -1).map((pt, idx) => (
+                <circle key={`wp-${idx}`} cx={pt[0]} cy={pt[1]} r={2.5} fill="hsl(280 100% 65%)" opacity={0.7} />
+              ))}
+              {/* Destination marker at runway end */}
+              {(() => {
+                const end = activeTaxiRoute.path[activeTaxiRoute.path.length - 1];
+                return (
+                  <g>
+                    <circle cx={end[0]} cy={end[1]} r={5} fill="none" stroke="hsl(280 100% 70%)" strokeWidth={1.5}>
+                      <animate attributeName="r" values="5;8;5" dur="2s" repeatCount="indefinite" />
+                      <animate attributeName="opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite" />
+                    </circle>
+                    <text x={end[0]} y={end[1] - 10} fill="hsl(280 100% 75%)" fontSize="7" fontFamily="Share Tech Mono" textAnchor="middle" fontWeight="bold">
+                      RWY {activeTaxiRoute.runway}
+                    </text>
+                  </g>
+                );
+              })()}
+              {/* Taxiway labels along route */}
+              {activeTaxiRoute.taxiways.map((tw, idx) => {
+                const segIdx = Math.min(idx + 1, activeTaxiRoute.path.length - 1);
+                const pt = activeTaxiRoute.path[segIdx];
+                return (
+                  <g key={`rtw-${idx}`}>
+                    <rect x={pt[0] + 5} y={pt[1] - 10} width={12} height={10} rx={2} fill="hsl(280 40% 20%)" stroke="hsl(280 100% 65%)" strokeWidth={0.6} />
+                    <text x={pt[0] + 11} y={pt[1] - 3} fill="hsl(280 100% 80%)" fontSize="6" fontFamily="Share Tech Mono" textAnchor="middle">{tw}</text>
+                  </g>
+                );
+              })}
+            </g>
+          )}
 
           {/* Ownship */}
           <AircraftIcon x={ownshipX} y={ownshipY} heading={flight.heading} />
