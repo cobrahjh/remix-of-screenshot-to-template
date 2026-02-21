@@ -112,7 +112,7 @@ const GtnDisplay = () => {
             className="flex items-center gap-0.5 hover:opacity-80 transition-opacity"
           >
             <Navigation className="w-3 h-3 text-avionics-magenta" />
-            <span className="text-[9px] text-avionics-magenta font-mono">D→</span>
+            <span className="text-[9px] text-avionics-magenta font-mono">DIRECT</span>
           </button>
           <button
             onClick={() => navigateTo("home")}
