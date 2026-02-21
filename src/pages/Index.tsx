@@ -148,7 +148,7 @@ const GtnDisplay = () => {
           /* Expanded: two rows of tabs, most-used first */
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Row 1: Most used */}
-            <div className="flex items-center overflow-x-auto px-0.5">
+            <div className="flex items-center w-full">
               {([
                 { label: "NAV MAP", page: "map" as const },
                 { label: "FPL", page: "flightplan" as const },
@@ -162,9 +162,9 @@ const GtnDisplay = () => {
                 <button
                   key={tab.page}
                   onClick={() => navigateTo(tab.page)}
-                  className={`px-1.5 py-[3px] text-[11px] font-mono whitespace-nowrap transition-colors ${
+                  className={`flex-1 py-1.5 text-[12px] font-mono whitespace-nowrap transition-colors text-center ${
                     currentPage === tab.page
-                      ? "text-avionics-cyan bg-avionics-button border-b border-avionics-cyan"
+                      ? "text-avionics-cyan bg-avionics-button border-b-2 border-avionics-cyan"
                       : "text-avionics-label hover:text-avionics-white"
                   }`}
                 >
@@ -173,7 +173,7 @@ const GtnDisplay = () => {
               ))}
             </div>
             {/* Row 2: Secondary */}
-            <div className="flex items-center overflow-x-auto px-0.5 border-t border-avionics-divider/30">
+            <div className="flex items-center w-full border-t border-avionics-divider/30">
               {([
                 { label: "TRFC", page: "traffic" as const },
                 { label: "TERR", page: "terrain" as const },
@@ -188,9 +188,9 @@ const GtnDisplay = () => {
                 <button
                   key={tab.page}
                   onClick={() => navigateTo(tab.page)}
-                  className={`px-1.5 py-[3px] text-[11px] font-mono whitespace-nowrap transition-colors ${
+                  className={`flex-1 py-1.5 text-[12px] font-mono whitespace-nowrap transition-colors text-center ${
                     currentPage === tab.page
-                      ? "text-avionics-cyan bg-avionics-button border-b border-avionics-cyan"
+                      ? "text-avionics-cyan bg-avionics-button border-b-2 border-avionics-cyan"
                       : "text-avionics-label hover:text-avionics-white"
                   }`}
                 >
