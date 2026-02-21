@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useFlightData } from "../FlightDataContext";
-import { PlaneTakeoff, AlertTriangle, ChevronDown, ChevronUp, Wind, Radio, Navigation, ShieldAlert } from "lucide-react";
+import { PlaneTakeoff, AlertTriangle, ChevronDown, ChevronUp, Wind, Radio, Navigation, ShieldAlert, Plane } from "lucide-react";
 
 interface RunwayData {
   id: string;
@@ -967,6 +967,29 @@ const TAXI_ROUTES: Record<string, Record<string, { path: [number, number][]; tax
   },
 };
 
+// Aircraft types with crosswind limits
+interface AircraftType {
+  id: string;
+  name: string;
+  shortName: string;
+  xwindLimit: number; // demonstrated crosswind component (kt)
+  xwindCaution: number; // caution threshold (kt)
+  category: "SE" | "ME" | "JET"; // single-engine, multi-engine, jet
+}
+
+const AIRCRAFT_TYPES: AircraftType[] = [
+  { id: "c172", name: "Cessna 172 Skyhawk", shortName: "C172", xwindLimit: 15, xwindCaution: 12, category: "SE" },
+  { id: "c182", name: "Cessna 182 Skylane", shortName: "C182", xwindLimit: 15, xwindCaution: 12, category: "SE" },
+  { id: "c152", name: "Cessna 152", shortName: "C152", xwindLimit: 12, xwindCaution: 9, category: "SE" },
+  { id: "pa28", name: "Piper PA-28 Cherokee", shortName: "PA28", xwindLimit: 17, xwindCaution: 14, category: "SE" },
+  { id: "sr22", name: "Cirrus SR22", shortName: "SR22", xwindLimit: 20, xwindCaution: 16, category: "SE" },
+  { id: "be36", name: "Beechcraft Bonanza A36", shortName: "BE36", xwindLimit: 17, xwindCaution: 14, category: "SE" },
+  { id: "da40", name: "Diamond DA40", shortName: "DA40", xwindLimit: 20, xwindCaution: 16, category: "SE" },
+  { id: "be58", name: "Beechcraft Baron 58", shortName: "BE58", xwindLimit: 22, xwindCaution: 18, category: "ME" },
+  { id: "pa44", name: "Piper PA-44 Seminole", shortName: "PA44", xwindLimit: 17, xwindCaution: 14, category: "ME" },
+  { id: "c525", name: "Cessna Citation CJ2", shortName: "C525", xwindLimit: 25, xwindCaution: 20, category: "JET" },
+];
+
 export const SafeTaxiScreen = () => {
   const { flight } = useFlightData();
   const [selectedAirport, setSelectedAirport] = useState<string>("KMRY");
@@ -974,10 +997,12 @@ export const SafeTaxiScreen = () => {
   const [atisOpen, setAtisOpen] = useState(false);
   const [showTaxiRoute, setShowTaxiRoute] = useState(true);
   const [xwindDismissed, setXwindDismissed] = useState(false);
+  const [selectedAircraft, setSelectedAircraft] = useState<string>("c172");
+  const [showAircraftPicker, setShowAircraftPicker] = useState(false);
 
-  // Aircraft crosswind limits (Cessna 172 demonstrated)
-  const XWIND_LIMIT = 15; // kt demonstrated crosswind component
-  const XWIND_CAUTION = 12; // kt caution threshold
+  const aircraft = AIRCRAFT_TYPES.find(a => a.id === selectedAircraft) || AIRCRAFT_TYPES[0];
+  const XWIND_LIMIT = aircraft.xwindLimit;
+  const XWIND_CAUTION = aircraft.xwindCaution;
 
   const airport = AIRPORTS[selectedAirport];
   const notams = NOTAMS[selectedAirport] || [];
@@ -1013,7 +1038,7 @@ export const SafeTaxiScreen = () => {
       }
     }
     return warnings;
-  }, [airport.runways, preferredRunways, wind]);
+  }, [airport.runways, preferredRunways, wind, XWIND_LIMIT, XWIND_CAUTION]);
 
   const hasXwindExceeded = xwindWarnings.some(w => w.exceeded);
   const hasXwindCaution = xwindWarnings.some(w => w.caution);
@@ -1083,6 +1108,43 @@ export const SafeTaxiScreen = () => {
             <Navigation className="w-2.5 h-2.5 inline-block mr-0.5" />
             TAXI RTE
           </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowAircraftPicker(!showAircraftPicker)}
+              className="font-mono text-[7px] px-1.5 py-0.5 rounded border border-avionics-cyan/40 text-avionics-cyan hover:bg-avionics-button transition-colors"
+            >
+              <Plane className="w-2.5 h-2.5 inline-block mr-0.5" />
+              {aircraft.shortName}
+              <ChevronDown className="w-2 h-2 inline-block ml-0.5" />
+            </button>
+            {showAircraftPicker && (
+              <div className="absolute top-full left-0 mt-1 z-50 bg-avionics-panel border border-avionics-divider rounded shadow-lg min-w-[200px] max-h-[200px] overflow-y-auto">
+                {(["SE", "ME", "JET"] as const).map(cat => {
+                  const catAircraft = AIRCRAFT_TYPES.filter(a => a.category === cat);
+                  if (catAircraft.length === 0) return null;
+                  return (
+                    <div key={cat}>
+                      <div className="px-2 py-0.5 font-mono text-[7px] text-avionics-label bg-avionics-inset border-b border-avionics-divider/30">
+                        {cat === "SE" ? "SINGLE ENGINE" : cat === "ME" ? "MULTI ENGINE" : "JET"}
+                      </div>
+                      {catAircraft.map(a => (
+                        <button
+                          key={a.id}
+                          onClick={() => { setSelectedAircraft(a.id); setShowAircraftPicker(false); setXwindDismissed(false); }}
+                          className={`w-full text-left px-2 py-1 font-mono text-[8px] flex items-center justify-between hover:bg-avionics-button transition-colors ${
+                            a.id === selectedAircraft ? "text-avionics-cyan bg-avionics-button" : "text-avionics-white"
+                          }`}
+                        >
+                          <span>{a.shortName} <span className="text-avionics-label text-[7px]">{a.name}</span></span>
+                          <span className="text-avionics-amber text-[7px]">X{a.xwindLimit}KT</span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <span className="font-mono text-[8px] text-avionics-label">
@@ -1132,7 +1194,7 @@ export const SafeTaxiScreen = () => {
               ))}
             </div>
             <span className={`font-mono text-[7px] ${hasXwindExceeded ? "text-red-400" : "text-yellow-400"}`}>
-              C172 DEMONSTRATED CROSSWIND: {XWIND_LIMIT}KT
+              {aircraft.shortName} DEMONSTRATED CROSSWIND: {XWIND_LIMIT}KT
             </span>
           </div>
           <button
