@@ -222,7 +222,7 @@ export const MapDisplay = () => {
   const rangeLayers = useRef<L.LayerGroup | null>(null);
   const terrainLayer = useRef<L.GridLayer | null>(null);
   const baseTileLayer = useRef<L.TileLayer | null>(null);
-  const { flightPlan, activeWaypointIndex, registerMapZoom, flyToTarget, clearFlyTo } = useGtn();
+  const { flightPlan, activeWaypointIndex, registerMapZoom, flyToTarget, clearFlyTo, activateDirectTo } = useGtn();
   const { flight, connectionMode } = useFlightData();
   const isLive = connectionMode !== "none";
   const [nexradOn, setNexradOn] = useState(false);
@@ -370,6 +370,9 @@ export const MapDisplay = () => {
             <span style="color:hsl(0,0%,55%);">DIS</span><span>${wp.dis.toFixed(1)} NM</span>
             <span style="color:hsl(0,0%,55%);">ETE</span><span>${wp.ete}</span>
           </div>
+          <button data-directto="${wp.name}" style="margin-top:8px;width:100%;padding:4px 0;font-family:'Share Tech Mono',monospace;font-size:11px;font-weight:700;color:hsl(300,80%,60%);background:hsla(300,80%,60%,0.12);border:1px solid hsl(300,80%,60%);border-radius:3px;cursor:pointer;letter-spacing:0.5px;transition:background 0.15s;">
+            ✈ DIRECT TO →
+          </button>
         </div>
       `;
       marker.bindPopup(popupContent, {
@@ -378,6 +381,18 @@ export const MapDisplay = () => {
         offset: [0, -8],
         autoPan: true,
         autoPanPadding: [40, 40],
+      });
+      marker.on("popupopen", () => {
+        const btn = document.querySelector(`button[data-directto="${wp.name}"]`) as HTMLElement;
+        if (btn) {
+          btn.onmouseenter = () => { btn.style.background = "hsla(300,80%,60%,0.25)"; };
+          btn.onmouseleave = () => { btn.style.background = "hsla(300,80%,60%,0.12)"; };
+          btn.onclick = (e) => {
+            e.stopPropagation();
+            map.closePopup();
+            activateDirectTo(wp.name);
+          };
+        }
       });
     });
 
