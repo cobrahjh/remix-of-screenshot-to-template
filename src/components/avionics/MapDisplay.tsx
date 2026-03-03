@@ -399,14 +399,35 @@ export const MapDisplay = () => {
     return () => observer.disconnect();
   }, []);
 
-  // Fly-to waypoint animation
+  // Fly-to waypoint animation with pulsing marker
   useEffect(() => {
     if (!mapInstance.current || !flyToTarget) return;
-    mapInstance.current.flyTo([flyToTarget.lat, flyToTarget.lng], 11, {
-      duration: 1.5,
-      easeLinearity: 0.25,
+    const map = mapInstance.current;
+    const { lat, lng } = flyToTarget;
+
+    map.flyTo([lat, lng], 11, { duration: 1.5, easeLinearity: 0.25 });
+
+    // Create pulsing highlight marker
+    const pulseIcon = L.divIcon({
+      className: "",
+      html: `<div class="flyto-pulse-marker"><div class="flyto-pulse-ring"></div><div class="flyto-pulse-dot"></div></div>`,
+      iconSize: [40, 40],
+      iconAnchor: [20, 20],
     });
+    const marker = L.marker([lat, lng], { icon: pulseIcon, interactive: false }).addTo(map);
+
+    // Fade out and remove after 4 seconds
+    const fadeTimer = setTimeout(() => {
+      const el = marker.getElement();
+      if (el) {
+        el.style.transition = "opacity 1s ease-out";
+        el.style.opacity = "0";
+      }
+    }, 3000);
+    const removeTimer = setTimeout(() => { map.removeLayer(marker); }, 4000);
+
     clearFlyTo();
+    return () => { clearTimeout(fadeTimer); clearTimeout(removeTimer); try { map.removeLayer(marker); } catch {} };
   }, [flyToTarget, clearFlyTo]);
 
   // Toggle NEXRAD layer
