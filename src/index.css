@@ -253,6 +253,7 @@
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
+    pointer-events: none !important;
   }
 
   .leaflet-tooltip-avionics::before {
