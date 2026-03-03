@@ -211,6 +211,38 @@ function getFlightCategory(metar: MetarData): FlightCategory {
   return "VFR";
 }
 
+function parseRawMetar(raw: string): { wdir?: number; wspd?: number; gust?: number; visib?: number; temp?: number; dewp?: number; altim?: number; clouds?: string } {
+  const result: ReturnType<typeof parseRawMetar> = {};
+  // Wind: e.g. 31012KT or 28018G25KT or VRB05KT
+  const windMatch = raw.match(/\b(\d{3}|VRB)(\d{2,3})(G(\d{2,3}))?KT\b/);
+  if (windMatch) {
+    result.wdir = windMatch[1] === "VRB" ? -1 : parseInt(windMatch[1]);
+    result.wspd = parseInt(windMatch[2]);
+    if (windMatch[4]) result.gust = parseInt(windMatch[4]);
+  }
+  // Visibility: e.g. 10SM or 2SM or 1/2SM
+  const visMatch = raw.match(/\b(\d+(?:\/\d+)?)\s*SM\b/);
+  if (visMatch) {
+    const parts = visMatch[1].split('/');
+    result.visib = parts.length === 2 ? parseInt(parts[0]) / parseInt(parts[1]) : parseInt(parts[0]);
+  }
+  // Temp/Dewpoint: e.g. 16/09 or M02/M05
+  const tempMatch = raw.match(/\b(M?\d{2})\/(M?\d{2})\b/);
+  if (tempMatch) {
+    result.temp = tempMatch[1].startsWith('M') ? -parseInt(tempMatch[1].slice(1)) : parseInt(tempMatch[1]);
+    result.dewp = tempMatch[2].startsWith('M') ? -parseInt(tempMatch[2].slice(1)) : parseInt(tempMatch[2]);
+  }
+  // Altimeter: e.g. A2991
+  const altMatch = raw.match(/\bA(\d{4})\b/);
+  if (altMatch) result.altim = parseInt(altMatch[1]) / 100;
+  // Clouds
+  const cloudMatches = raw.matchAll(/\b(FEW|SCT|BKN|OVC|CLR|SKC)(\d{3})?\b/g);
+  const clouds: string[] = [];
+  for (const m of cloudMatches) clouds.push(m[0]);
+  if (clouds.length) result.clouds = clouds.join(' ');
+  return result;
+}
+
 export const MapDisplay = () => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
@@ -231,7 +263,7 @@ export const MapDisplay = () => {
   const [procOn, setProcOn] = useState(false);
   const [rangeOn, setRangeOn] = useState(false);
   const [terrainOn, setTerrainOn] = useState(false);
-  const [metarData, setMetarData] = useState<Record<string, { category: FlightCategory; raw?: string }>>({});
+  const [metarData, setMetarData] = useState<Record<string, { category: FlightCategory; raw?: string; wdir?: number; wspd?: number; gust?: number; visib?: number; temp?: number; dewp?: number; altim?: number; clouds?: string }>>({});
   const [metarLoading, setMetarLoading] = useState(false);
 
   // Fetch METARs via edge function, fallback to simulated data
@@ -243,12 +275,18 @@ export const MapDisplay = () => {
       });
       if (error) throw error;
       if (data?.success && Array.isArray(data.data?.metars)) {
-        const parsed: Record<string, { category: FlightCategory; raw?: string }> = {};
+        const parsed: Record<string, typeof metarData[string]> = {};
         for (const m of data.data.metars as MetarData[]) {
           if (m.icaoId) {
             parsed[m.icaoId] = {
               category: getFlightCategory(m),
               raw: m.rawOb,
+              wdir: m.wdir,
+              wspd: m.wspd,
+              temp: m.temp,
+              dewp: m.dewp,
+              visib: m.visib,
+              clouds: m.clouds?.map(c => `${c.cover}${c.base ? String(c.base).padStart(3, '0') : ''}`).join(' '),
             };
           }
         }
@@ -282,11 +320,14 @@ export const MapDisplay = () => {
       "KPRB 202053Z 31010KT 10SM CLR 23/05 A2991",
       "KSBP 202053Z 28020G28KT 1SM FG OVC001 11/10 A2987",
     ];
-    const parsed: Record<string, { category: FlightCategory; raw?: string }> = {};
+    const parsed: Record<string, typeof metarData[string]> = {};
     METAR_STATIONS.forEach((s, i) => {
+      const raw = simRaws[i] || `${s.icao} DATA UNAVAILABLE`;
+      const p = parseRawMetar(raw);
       parsed[s.icao] = {
         category: simCategories[i] || "VFR",
-        raw: simRaws[i] || `${s.icao} DATA UNAVAILABLE`,
+        raw,
+        ...p,
       };
     });
     setMetarData(parsed);
@@ -757,17 +798,45 @@ export const MapDisplay = () => {
         iconAnchor: [size / 2, size / 2],
       });
 
-      const marker = L.marker([station.lat, station.lng], { icon, zIndexOffset: 800 });
+      const marker = L.marker([station.lat, station.lng], { icon, zIndexOffset: 800, interactive: true });
 
-      const tooltipContent = `<div style="font-family:'Share Tech Mono',monospace;font-size:9px;background:hsla(220,20%,8%,0.92);padding:3px 6px;border:1px solid ${color};border-radius:3px;max-width:220px;">
-        <div style="color:${color};font-weight:bold;margin-bottom:2px;">${station.icao} — ${category}</div>
-        ${info?.raw ? `<div style="color:hsl(0,0%,70%);font-size:8px;word-break:break-all;">${info.raw}</div>` : '<div style="color:hsl(0,0%,50%);font-size:8px;">No data</div>'}
-      </div>`;
+      // Hover tooltip — compact
+      marker.bindTooltip(
+        `<span style="font-family:'Share Tech Mono',monospace;font-size:9px;color:${color};background:hsla(220,20%,8%,0.9);padding:1px 4px;border:1px solid ${color};border-radius:2px;">${station.icao} ${category}</span>`,
+        { direction: "right", offset: [10, 0], className: "leaflet-tooltip-avionics" }
+      );
 
-      marker.bindTooltip(tooltipContent, {
-        direction: "top",
+      // Tap popup — detailed weather info
+      const windStr = info?.wdir !== undefined && info?.wspd !== undefined
+        ? `${info.wdir === -1 ? 'VRB' : String(info.wdir).padStart(3, '0')}° @ ${info.wspd} kt${info.gust ? ` G${info.gust}` : ''}`
+        : '---';
+      const visStr = info?.visib !== undefined ? `${info.visib} SM` : '---';
+      const tempStr = info?.temp !== undefined && info?.dewp !== undefined ? `${info.temp}°C / ${info.dewp}°C` : '---';
+      const altStr = info?.altim !== undefined ? `${info.altim.toFixed(2)}"` : '---';
+      const cloudStr = info?.clouds || '---';
+
+      const popupContent = `
+        <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:hsl(0,0%,90%);background:hsla(220,20%,8%,0.95);border:1px solid ${color};border-radius:4px;padding:8px 10px;min-width:180px;max-width:260px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <span style="font-size:13px;font-weight:700;color:${color};letter-spacing:0.5px;">${station.icao}</span>
+            <span style="font-size:10px;font-weight:700;color:${color};background:${color}22;padding:1px 6px;border-radius:2px;border:1px solid ${color}66;">${category}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:2px 8px;font-size:10px;margin-bottom:6px;">
+            <span style="color:hsl(0,0%,55%);">WIND</span><span>${windStr}</span>
+            <span style="color:hsl(0,0%,55%);">VIS</span><span>${visStr}</span>
+            <span style="color:hsl(0,0%,55%);">CEIL</span><span>${cloudStr}</span>
+            <span style="color:hsl(0,0%,55%);">T/D</span><span>${tempStr}</span>
+            <span style="color:hsl(0,0%,55%);">ALTM</span><span>${altStr}</span>
+          </div>
+          ${info?.raw ? `<div style="color:hsl(0,0%,60%);font-size:8px;word-break:break-all;border-top:1px solid hsl(220,15%,20%);padding-top:4px;margin-top:2px;">${info.raw}</div>` : ''}
+        </div>
+      `;
+      marker.bindPopup(popupContent, {
+        className: "waypoint-info-popup",
+        closeButton: false,
         offset: [0, -10],
-        className: "leaflet-tooltip-avionics",
+        autoPan: true,
+        autoPanPadding: [40, 40],
       });
 
       metarMarkers.current.addLayer(marker);
