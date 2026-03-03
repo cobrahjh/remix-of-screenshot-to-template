@@ -288,6 +288,9 @@
   border-radius: 50%;
   animation: flyto-ping 1.2s ease-out infinite;
 }
+.flyto-pulse-ring-delayed {
+  animation-delay: 0.4s;
+}
 @keyframes flyto-ping {
   0% { transform: scale(0.3); opacity: 1; }
   100% { transform: scale(1.2); opacity: 0; }
