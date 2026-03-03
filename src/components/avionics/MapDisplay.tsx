@@ -410,7 +410,7 @@ export const MapDisplay = () => {
     // Create pulsing highlight marker
     const pulseIcon = L.divIcon({
       className: "",
-      html: `<div class="flyto-pulse-marker"><div class="flyto-pulse-ring"></div><div class="flyto-pulse-dot"></div></div>`,
+      html: `<div class="flyto-pulse-marker"><div class="flyto-pulse-ring"></div><div class="flyto-pulse-ring flyto-pulse-ring-delayed"></div><div class="flyto-pulse-dot"></div></div>`,
       iconSize: [40, 40],
       iconAnchor: [20, 20],
     });
