@@ -222,7 +222,7 @@ export const MapDisplay = () => {
   const rangeLayers = useRef<L.LayerGroup | null>(null);
   const terrainLayer = useRef<L.GridLayer | null>(null);
   const baseTileLayer = useRef<L.TileLayer | null>(null);
-  const { flightPlan, activeWaypointIndex, registerMapZoom, flyToTarget, clearFlyTo, activateDirectTo } = useGtn();
+  const { flightPlan, activeWaypointIndex, registerMapZoom, flyToTarget, clearFlyTo, activateDirectTo, directToTarget, cancelDirectTo } = useGtn();
   const { flight, connectionMode } = useFlightData();
   const isLive = connectionMode !== "none";
   const [nexradOn, setNexradOn] = useState(false);
@@ -933,6 +933,21 @@ export const MapDisplay = () => {
           </div>
         )}
       </div>
+
+      {/* Cancel Direct To overlay */}
+      {directToTarget && (
+        <button
+          onClick={e => { e.stopPropagation(); cancelDirectTo(); }}
+          onMouseDown={e => e.stopPropagation()}
+          className="absolute bottom-2 right-2 z-[1000] flex items-center gap-1.5 font-mono text-[10px] font-bold text-avionics-magenta bg-avionics-panel-dark/90 border border-avionics-magenta/60 rounded px-2.5 py-1.5 hover:bg-avionics-magenta/20 transition-colors"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" className="shrink-0">
+            <line x1="1" y1="1" x2="9" y2="9" stroke="currentColor" strokeWidth="1.5" />
+            <line x1="9" y1="1" x2="1" y2="9" stroke="currentColor" strokeWidth="1.5" />
+          </svg>
+          CANCEL D→ {directToTarget}
+        </button>
+      )}
 
       {/* Range indicator */}
       <div className="absolute bottom-2 left-2 z-[1000] font-mono text-[9px] text-avionics-label bg-avionics-panel-dark/80 px-1.5 py-0.5 rounded" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
