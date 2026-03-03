@@ -347,11 +347,38 @@ export const MapDisplay = () => {
         iconAnchor: [size / 2, size / 2],
       });
 
-      const marker = L.marker([wp.lat, wp.lng], { icon }).addTo(map);
+      const marker = L.marker([wp.lat, wp.lng], { icon, interactive: true }).addTo(map);
       marker.bindTooltip(
         `<span style="font-family:'Share Tech Mono',monospace;font-size:10px;color:${color};background:hsla(220,20%,8%,0.85);padding:1px 4px;border:1px solid ${color};border-radius:2px;">${wp.name}${wp.alt ? ` ${wp.alt}'` : ""}</span>`,
         { permanent: true, direction: "right", offset: [6, 0], className: "leaflet-tooltip-avionics" }
       );
+
+      // Waypoint info popup on tap
+      const typeLabel = wp.type === "airport" ? "AIRPORT" : wp.type === "vor" ? "VOR" : wp.type === "ndb" ? "NDB" : wp.type === "fix" ? "FIX" : "USER";
+      const latDir = wp.lat >= 0 ? "N" : "S";
+      const lngDir = wp.lng >= 0 ? "E" : "W";
+      const latDeg = Math.abs(wp.lat).toFixed(4);
+      const lngDeg = Math.abs(wp.lng).toFixed(4);
+      const popupContent = `
+        <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:hsl(0,0%,90%);background:hsla(220,20%,8%,0.95);border:1px solid ${color};border-radius:4px;padding:8px 10px;min-width:160px;">
+          <div style="font-size:13px;font-weight:700;color:${color};margin-bottom:4px;letter-spacing:0.5px;">${wp.name}</div>
+          <div style="color:hsl(0,0%,60%);font-size:9px;margin-bottom:6px;text-transform:uppercase;">${typeLabel}</div>
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:2px 8px;font-size:10px;">
+            <span style="color:hsl(0,0%,55%);">POS</span><span>${latDir}${latDeg}° ${lngDir}${lngDeg}°</span>
+            ${wp.alt ? `<span style="color:hsl(0,0%,55%);">ALT</span><span>${wp.alt.toLocaleString()}'</span>` : ""}
+            <span style="color:hsl(0,0%,55%);">DTK</span><span>${wp.dtk.toString().padStart(3, "0")}°</span>
+            <span style="color:hsl(0,0%,55%);">DIS</span><span>${wp.dis.toFixed(1)} NM</span>
+            <span style="color:hsl(0,0%,55%);">ETE</span><span>${wp.ete}</span>
+          </div>
+        </div>
+      `;
+      marker.bindPopup(popupContent, {
+        className: "waypoint-info-popup",
+        closeButton: false,
+        offset: [0, -8],
+        autoPan: true,
+        autoPanPadding: [40, 40],
+      });
     });
 
     // Aircraft marker
