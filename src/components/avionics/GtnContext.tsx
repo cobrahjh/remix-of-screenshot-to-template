@@ -57,6 +57,7 @@ interface GtnState {
   gpsPhase: "ENR" | "TERM" | "APCH" | "GA";
   obsMode: boolean;
   obsCourse: number;
+  flyToTarget: { lat: number; lng: number } | null;
 }
 
 interface GtnContextValue extends GtnState {
@@ -82,6 +83,8 @@ interface GtnContextValue extends GtnState {
   mapZoomIn: () => void;
   mapZoomOut: () => void;
   registerMapZoom: (zoomIn: () => void, zoomOut: () => void) => void;
+  flyToWaypoint: (lat: number, lng: number) => void;
+  clearFlyTo: () => void;
 }
 
 const GtnContext = createContext<GtnContextValue | null>(null);
@@ -137,6 +140,7 @@ export const GtnProvider = ({ children }: { children: React.ReactNode }) => {
     gpsPhase: "ENR",
     obsMode: false,
     obsCourse: 315,
+    flyToTarget: null,
   });
 
   const closeAllPanels = () => ({ comPanelOpen: false, audioPanelOpen: false, xpdrPanelOpen: false });
@@ -242,6 +246,14 @@ export const GtnProvider = ({ children }: { children: React.ReactNode }) => {
   const mapZoomIn = useCallback(() => { mapZoomRef.current?.zoomIn(); }, []);
   const mapZoomOut = useCallback(() => { mapZoomRef.current?.zoomOut(); }, []);
 
+  const flyToWaypoint = useCallback((lat: number, lng: number) => {
+    setState(s => ({ ...s, flyToTarget: { lat, lng }, currentPage: "map" as GtnPage, ...closeAllPanels() }));
+  }, []);
+
+  const clearFlyTo = useCallback(() => {
+    setState(s => ({ ...s, flyToTarget: null }));
+  }, []);
+
   return (
     <GtnContext.Provider value={{
       ...state, navigateTo, goBack, swapComFreqs, setComStandby,
@@ -249,7 +261,7 @@ export const GtnProvider = ({ children }: { children: React.ReactNode }) => {
       setXpdrMode, setXpdrCode, toggleAudioSetting,
       activateDirectTo, cancelDirectTo, toggleSmartGlide, toggleEmergencyDescent,
       setActiveWaypoint, setFlightPlan, setSelectedAircraft, toggleObs, setObsCourse,
-      mapZoomIn, mapZoomOut, registerMapZoom,
+      mapZoomIn, mapZoomOut, registerMapZoom, flyToWaypoint, clearFlyTo,
     }}>
       {children}
     </GtnContext.Provider>

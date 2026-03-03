@@ -222,7 +222,7 @@ export const MapDisplay = () => {
   const rangeLayers = useRef<L.LayerGroup | null>(null);
   const terrainLayer = useRef<L.GridLayer | null>(null);
   const baseTileLayer = useRef<L.TileLayer | null>(null);
-  const { flightPlan, activeWaypointIndex, registerMapZoom } = useGtn();
+  const { flightPlan, activeWaypointIndex, registerMapZoom, flyToTarget, clearFlyTo } = useGtn();
   const { flight, connectionMode } = useFlightData();
   const isLive = connectionMode !== "none";
   const [nexradOn, setNexradOn] = useState(false);
@@ -398,6 +398,16 @@ export const MapDisplay = () => {
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
     return () => observer.disconnect();
   }, []);
+
+  // Fly-to waypoint animation
+  useEffect(() => {
+    if (!mapInstance.current || !flyToTarget) return;
+    mapInstance.current.flyTo([flyToTarget.lat, flyToTarget.lng], 11, {
+      duration: 1.5,
+      easeLinearity: 0.25,
+    });
+    clearFlyTo();
+  }, [flyToTarget, clearFlyTo]);
 
   // Toggle NEXRAD layer
   useEffect(() => {
