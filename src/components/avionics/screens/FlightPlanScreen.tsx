@@ -1,6 +1,6 @@
 import { useGtn, FlightPlanWaypoint } from "../GtnContext";
 import { useState, useMemo, useRef, useCallback } from "react";
-import { Upload, Download, FileText, X, AlertTriangle, Plane } from "lucide-react";
+import { Upload, Download, FileText, X, AlertTriangle, Plane, MapPin } from "lucide-react";
 
 /* ─── Flight Plan Parsers ─── */
 
@@ -588,7 +588,7 @@ const VnavProfile = ({ flightPlan, activeWaypointIndex }: { flightPlan: FlightPl
 };
 
 export const FlightPlanScreen = () => {
-  const { flightPlan, activeWaypointIndex, setActiveWaypoint, setFlightPlan, setSelectedAircraft, navigateTo } = useGtn();
+  const { flightPlan, activeWaypointIndex, setActiveWaypoint, setFlightPlan, setSelectedAircraft, navigateTo, flyToWaypoint } = useGtn();
   const [selectedWp, setSelectedWp] = useState<number | null>(null);
   const [showVnav, setShowVnav] = useState(true);
   const [showImport, setShowImport] = useState(false);
@@ -749,6 +749,17 @@ export const FlightPlanScreen = () => {
             className="flex-1 py-2 text-center font-mono text-[10px] text-avionics-green hover:bg-avionics-button-hover border-r border-avionics-divider transition-colors"
           >
             Activate Leg
+          </button>
+          <button
+            onClick={() => {
+              const wp = flightPlan[selectedWp];
+              if (wp) flyToWaypoint(wp.lat, wp.lng);
+              setSelectedWp(null);
+            }}
+            className="flex-1 py-2 text-center font-mono text-[10px] text-avionics-magenta hover:bg-avionics-button-hover border-r border-avionics-divider transition-colors flex items-center justify-center gap-1"
+          >
+            <MapPin className="w-3 h-3" />
+            Show Map
           </button>
           <button
             onClick={() => { navigateTo("directto"); }}
